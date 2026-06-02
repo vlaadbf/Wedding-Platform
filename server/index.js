@@ -1562,20 +1562,18 @@ const mimeTypes = {
 };
 
 async function serveStatic(req, res, url) {
-  const distDir = join(rootDir, "dist");
+  const distDir = resolve(rootDir, "dist");
 
-  let pathname = decodeURIComponent(url.pathname);
+  let pathname = decodeURIComponent(url.pathname || "/");
 
   if (pathname === "/") {
     pathname = "/index.html";
   }
 
-  // Eliminam slash-ul de la inceput ca path.join sa nu ignore distDir
   const relativePath = pathname.replace(/^\/+/, "");
   const filePath = resolve(distDir, relativePath);
 
-  // Protectie path traversal
-  if (!filePath.startsWith(distDir)) {
+  if (!filePath.startsWith(distDir + "\\" ) && !filePath.startsWith(distDir + "/") && filePath !== distDir) {
     res.writeHead(403, securityHeaders({
       "Content-Type": "text/plain; charset=utf-8"
     }));
@@ -1593,6 +1591,7 @@ async function serveStatic(req, res, url) {
     }));
 
     res.end(file);
+    return;
   } catch {
     if (pathname.startsWith("/assets/") || extname(pathname)) {
       res.writeHead(404, securityHeaders({
@@ -1602,7 +1601,7 @@ async function serveStatic(req, res, url) {
       return;
     }
 
-    const fallback = await readFile(join(distDir, "index.html"));
+    const fallback = await readFile(resolve(distDir, "index.html"));
 
     res.writeHead(200, securityHeaders({
       "Content-Type": "text/html; charset=utf-8",
@@ -1612,7 +1611,6 @@ async function serveStatic(req, res, url) {
     res.end(fallback);
   }
 }
-
 createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host}`);
   try {
