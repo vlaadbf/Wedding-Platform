@@ -467,10 +467,25 @@ function publicOrigin(req) {
 function isAllowedOrigin(req) {
   const origin = req.headers.origin;
   if (!origin) return true;
+
   try {
-    const current = new URL(`http://${req.headers.host}`);
     const incoming = new URL(origin);
-    return incoming.hostname === current.hostname && ["5173", "4000", current.port].includes(incoming.port || (incoming.protocol === "https:" ? "443" : "80"));
+
+    const hostHeader = String(req.headers["x-forwarded-host"] || req.headers.host || "");
+    const currentHostname = hostHeader.split(":")[0];
+
+    // Permite acelasi domeniu, indiferent daca e https pe 443 sau local pe 4000/5173
+    if (incoming.hostname === currentHostname) return true;
+
+    // Permite local development
+    if (
+      ["localhost", "127.0.0.1"].includes(incoming.hostname) &&
+      ["5173", "4000"].includes(incoming.port)
+    ) {
+      return true;
+    }
+
+    return false;
   } catch {
     return false;
   }
