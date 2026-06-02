@@ -1570,12 +1570,22 @@ async function serveStatic(req, res, url) {
     pathname = "/index.html";
   }
 
-  const filePath = join(distDir, pathname);
-  const safePath = filePath.startsWith(distDir) ? filePath : join(distDir, "index.html");
+  // Eliminam slash-ul de la inceput ca path.join sa nu ignore distDir
+  const relativePath = pathname.replace(/^\/+/, "");
+  const filePath = resolve(distDir, relativePath);
+
+  // Protectie path traversal
+  if (!filePath.startsWith(distDir)) {
+    res.writeHead(403, securityHeaders({
+      "Content-Type": "text/plain; charset=utf-8"
+    }));
+    res.end("Forbidden");
+    return;
+  }
 
   try {
-    const file = await readFile(safePath);
-    const ext = extname(safePath).toLowerCase();
+    const file = await readFile(filePath);
+    const ext = extname(filePath).toLowerCase();
 
     res.writeHead(200, securityHeaders({
       "Content-Type": mimeTypes[ext] || "application/octet-stream",
@@ -1584,8 +1594,6 @@ async function serveStatic(req, res, url) {
 
     res.end(file);
   } catch {
-    // Daca browserul cere un fisier real, gen /assets/index.js sau /assets/index.css,
-    // nu trimitem index.html, ci 404 corect.
     if (pathname.startsWith("/assets/") || extname(pathname)) {
       res.writeHead(404, securityHeaders({
         "Content-Type": "text/plain; charset=utf-8"
@@ -1594,19 +1602,14 @@ async function serveStatic(req, res, url) {
       return;
     }
 
-    // Pentru rute React, gen /dashboard, /invite/..., trimitem index.html.
-    try {
-      const fallback = await readFile(join(distDir, "index.html"));
+    const fallback = await readFile(join(distDir, "index.html"));
 
-      res.writeHead(200, securityHeaders({
-        "Content-Type": "text/html; charset=utf-8",
-        "Cache-Control": "no-store"
-      }));
+    res.writeHead(200, securityHeaders({
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store"
+    }));
 
-      res.end(fallback);
-    } catch {
-      send(res, 500, { message: "Nu exista folderul dist. Ruleaza npm run build." });
-    }
+    res.end(fallback);
   }
 }
 
