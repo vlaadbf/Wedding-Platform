@@ -1547,14 +1547,15 @@ async function handleApi(req, res, url) {
 }
 
 const mimeTypes = {
-  ".html": "text/html; charset=utf-8",
-  ".js": "text/javascript; charset=utf-8",
+   ".html": "text/html; charset=utf-8",
+  ".js": "application/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".svg": "image/svg+xml",
   ".png": "image/png",
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
   ".webp": "image/webp",
+  ".ico": "image/x-icon",
   ".mp4": "video/mp4",
   ".webm": "video/webm",
   ".mov": "video/quicktime"
@@ -1562,21 +1563,49 @@ const mimeTypes = {
 
 async function serveStatic(req, res, url) {
   const distDir = join(rootDir, "dist");
+
   let pathname = decodeURIComponent(url.pathname);
-  if (pathname === "/") pathname = "/index.html";
+
+  if (pathname === "/") {
+    pathname = "/index.html";
+  }
+
   const filePath = join(distDir, pathname);
   const safePath = filePath.startsWith(distDir) ? filePath : join(distDir, "index.html");
+
   try {
     const file = await readFile(safePath);
-    res.writeHead(200, securityHeaders({ "Content-Type": mimeTypes[extname(safePath)] || "application/octet-stream", "Cache-Control": "public, max-age=3600" }));
+    const ext = extname(safePath).toLowerCase();
+
+    res.writeHead(200, securityHeaders({
+      "Content-Type": mimeTypes[ext] || "application/octet-stream",
+      "Cache-Control": ext === ".html" ? "no-store" : "public, max-age=31536000"
+    }));
+
     res.end(file);
   } catch {
+    // Daca browserul cere un fisier real, gen /assets/index.js sau /assets/index.css,
+    // nu trimitem index.html, ci 404 corect.
+    if (pathname.startsWith("/assets/") || extname(pathname)) {
+      res.writeHead(404, securityHeaders({
+        "Content-Type": "text/plain; charset=utf-8"
+      }));
+      res.end("File not found");
+      return;
+    }
+
+    // Pentru rute React, gen /dashboard, /invite/..., trimitem index.html.
     try {
       const fallback = await readFile(join(distDir, "index.html"));
-      res.writeHead(200, securityHeaders({ "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" }));
+
+      res.writeHead(200, securityHeaders({
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store"
+      }));
+
       res.end(fallback);
     } catch {
-      send(res, 200, { message: "API pornit. Ruleaza si `npm run dev` pentru interfata React." });
+      send(res, 500, { message: "Nu exista folderul dist. Ruleaza npm run build." });
     }
   }
 }
