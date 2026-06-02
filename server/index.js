@@ -1547,7 +1547,7 @@ async function handleApi(req, res, url) {
 }
 
 const mimeTypes = {
-   ".html": "text/html; charset=utf-8",
+  ".html": "text/html; charset=utf-8",
   ".js": "application/javascript; charset=utf-8",
   ".css": "text/css; charset=utf-8",
   ".svg": "image/svg+xml",
@@ -1572,14 +1572,6 @@ async function serveStatic(req, res, url) {
 
   const relativePath = pathname.replace(/^\/+/, "");
   const filePath = resolve(distDir, relativePath);
-
-  if (!filePath.startsWith(distDir + "\\" ) && !filePath.startsWith(distDir + "/") && filePath !== distDir) {
-    res.writeHead(403, securityHeaders({
-      "Content-Type": "text/plain; charset=utf-8"
-    }));
-    res.end("Forbidden");
-    return;
-  }
 
   try {
     const file = await readFile(filePath);
