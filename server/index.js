@@ -1,10 +1,11 @@
 import { createServer } from "node:http";
-import { readFile, writeFile } from "node:fs/promises";
+import { copyFile, readFile, writeFile } from "node:fs/promises";
 import { createReadStream, existsSync, mkdirSync } from "node:fs";
 import { basename, extname, join, resolve } from "node:path";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { createRequire } from "node:module";
 import { DatabaseSync } from "node:sqlite";
+import bcrypt from "bcryptjs";
 
 const require = createRequire(import.meta.url);
 const AdmZip = require("adm-zip");
@@ -16,6 +17,13 @@ const uploadsDir = join(dataDir, "uploads");
 const dbPath = join(dataDir, "wedding.sqlite");
 const port = Number(process.env.PORT || 4000);
 const sessionTtlMs = 1000 * 60 * 60 * 24 * 7;
+const sessionIdleMs = 1000 * 60 * 60 * 2;
+const loginWindowMs = 1000 * 60 * 10;
+const loginMaxFailures = 5;
+const apiWindowMs = 1000 * 60;
+const apiMaxRequests = 240;
+const loginFailures = new Map();
+const apiHits = new Map();
 
 for (const dir of [dataDir, uploadsDir]) {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
@@ -24,21 +32,44 @@ for (const dir of [dataDir, uploadsDir]) {
 const db = new DatabaseSync(dbPath);
 db.exec("PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;");
 
+async function backupDatabase() {
+  if (!existsSync(dbPath)) return;
+  const backupDir = join(dataDir, "backups");
+  if (!existsSync(backupDir)) mkdirSync(backupDir, { recursive: true });
+  const stamp = new Date().toISOString().slice(0, 10);
+  const target = join(backupDir, `wedding-${stamp}.sqlite`);
+  if (!existsSync(target)) await copyFile(dbPath, target);
+}
+
 function id(prefix = "id") {
   return `${prefix}_${randomBytes(12).toString("hex")}`;
 }
 
 function token() {
-  return randomBytes(20).toString("base64url");
+  return randomBytes(32).toString("base64url");
 }
 
-function hashPassword(password, salt = randomBytes(16).toString("hex")) {
-  return { salt, hash: createHash("sha256").update(`${salt}:${password}`).digest("hex") };
+function passwordPolicyError(password) {
+  const value = String(password || "");
+  if (value.length < 10) return "Parola trebuie sa aiba minimum 10 caractere.";
+  if (!/[A-Z]/.test(value)) return "Parola trebuie sa contina cel putin o litera mare.";
+  if (!/\d/.test(value)) return "Parola trebuie sa contina cel putin o cifra.";
+  if (!/[^A-Za-z0-9]/.test(value)) return "Parola trebuie sa contina cel putin un simbol.";
+  return "";
+}
+
+function hashPassword(password) {
+  return { salt: "bcrypt", hash: bcrypt.hashSync(String(password), 12) };
 }
 
 function verifyPassword(password, user) {
-  const { hash } = hashPassword(password, user.salt);
-  return timingSafeEqual(Buffer.from(hash), Buffer.from(user.password_hash));
+  if (!user?.password_hash) return { ok: false, needsRehash: false };
+  if (user.salt === "bcrypt" || String(user.password_hash).startsWith("$2")) {
+    return { ok: bcrypt.compareSync(String(password), user.password_hash), needsRehash: false };
+  }
+  const legacyHash = createHash("sha256").update(`${user.salt}:${password}`).digest("hex");
+  const ok = legacyHash.length === user.password_hash.length && timingSafeEqual(Buffer.from(legacyHash), Buffer.from(user.password_hash));
+  return { ok, needsRehash: ok };
 }
 
 function tableColumns(table) {
@@ -54,6 +85,9 @@ function migrate() {
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
+      first_name TEXT,
+      last_name TEXT,
+      phone TEXT,
       email TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
       salt TEXT NOT NULL,
@@ -73,6 +107,7 @@ function migrate() {
       map_url TEXT,
       dress_code TEXT,
       hero_image_url TEXT,
+      invite_secondary_image_url TEXT,
       profile_image_url TEXT,
       theme_color TEXT NOT NULL DEFAULT 'sage',
       invitation_template TEXT NOT NULL DEFAULT 'custom',
@@ -98,7 +133,9 @@ function migrate() {
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
       active_wedding_id TEXT,
+      csrf_token TEXT,
       expires_at INTEGER NOT NULL,
+      last_seen_at INTEGER,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -112,6 +149,7 @@ function migrate() {
       status TEXT NOT NULL DEFAULT 'In asteptare',
       meal TEXT,
       meal_choice TEXT,
+      meal_choices_json TEXT NOT NULL DEFAULT '[]',
       allergies TEXT,
       guest_message TEXT,
       seats INTEGER NOT NULL DEFAULT 1,
@@ -202,14 +240,38 @@ function migrate() {
       seen_at TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS login_events (
+      id TEXT PRIMARY KEY,
+      email TEXT,
+      ip TEXT,
+      success INTEGER NOT NULL DEFAULT 0,
+      reason TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS audit_events (
+      id TEXT PRIMARY KEY,
+      wedding_id TEXT,
+      user_id TEXT,
+      role TEXT,
+      action TEXT NOT NULL,
+      target TEXT,
+      detail TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   addColumn("users", "is_super_admin", "INTEGER NOT NULL DEFAULT 0");
   addColumn("users", "status", "TEXT NOT NULL DEFAULT 'active'");
+  addColumn("users", "first_name", "TEXT");
+  addColumn("users", "last_name", "TEXT");
+  addColumn("users", "phone", "TEXT");
   addColumn("media_uploads", "seen_at", "TEXT");
   addColumn("activity_events", "seen_at", "TEXT");
   addColumn("weddings", "wedding_time", "TEXT");
   addColumn("weddings", "profile_image_url", "TEXT");
+  addColumn("weddings", "invite_secondary_image_url", "TEXT");
   addColumn("weddings", "theme_color", "TEXT NOT NULL DEFAULT 'sage'");
   addColumn("weddings", "invitation_template", "TEXT NOT NULL DEFAULT 'custom'");
   addColumn("weddings", "brand_name", "TEXT NOT NULL DEFAULT 'Gestionare Nunta'");
@@ -221,6 +283,7 @@ function migrate() {
       ["wedding_id", "TEXT"],
       ["group_name", "TEXT"],
       ["meal_choice", "TEXT"],
+      ["meal_choices_json", "TEXT NOT NULL DEFAULT '[]'"],
       ["allergies", "TEXT"],
       ["guest_message", "TEXT"],
       ["response_locked", "INTEGER NOT NULL DEFAULT 0"],
@@ -237,7 +300,7 @@ function migrate() {
       ["stage", "TEXT NOT NULL DEFAULT 'General'"],
       ["priority", "TEXT NOT NULL DEFAULT 'Medie'"]
     ],
-    sessions: [["active_wedding_id", "TEXT"]]
+    sessions: [["active_wedding_id", "TEXT"], ["csrf_token", "TEXT"], ["last_seen_at", "INTEGER"]]
   })) {
     for (const [column, definition] of columns) addColumn(table, column, definition);
   }
@@ -334,6 +397,7 @@ function seed() {
 }
 
 migrate();
+backupDatabase().catch((error) => console.warn(`Backup baza de date esuat: ${error.message}`));
 
 function parseCookies(header = "") {
   return Object.fromEntries(header.split(";").filter(Boolean).map((part) => {
@@ -342,25 +406,35 @@ function parseCookies(header = "") {
   }));
 }
 
+function securityHeaders(extra = {}) {
+  return {
+    "Cache-Control": "no-store",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Content-Security-Policy": "default-src 'self'; img-src 'self' data: https: blob:; media-src 'self' data: https: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+    ...extra
+  };
+}
+
 function send(res, status, payload, extraHeaders = {}) {
   const body = payload === null ? "" : JSON.stringify(payload);
-  res.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", ...extraHeaders });
+  res.writeHead(status, securityHeaders({ "Content-Type": "application/json; charset=utf-8", ...extraHeaders }));
   res.end(body);
 }
 
 function sendText(res, status, body, fileName) {
-  res.writeHead(status, {
+  res.writeHead(status, securityHeaders({
     "Content-Type": "text/csv; charset=utf-8",
-    "Content-Disposition": `attachment; filename="${fileName}"`,
-    "Cache-Control": "no-store"
-  });
+    "Content-Disposition": `attachment; filename="${fileName}"`
+  }));
   res.end(body);
 }
 
 function sendFile(res, filePath, mimeType = "application/octet-stream", downloadName = "") {
   const headers = { "Content-Type": mimeType, "Cache-Control": "private, max-age=60" };
   if (downloadName) headers["Content-Disposition"] = `attachment; filename="${downloadName}"`;
-  res.writeHead(200, headers);
+  res.writeHead(200, securityHeaders(headers));
   createReadStream(filePath).pipe(res);
 }
 
@@ -390,17 +464,110 @@ function publicOrigin(req) {
   return `${req.headers["x-forwarded-proto"] || "http"}://${host}`;
 }
 
+function isAllowedOrigin(req) {
+  const origin = req.headers.origin;
+  if (!origin) return true;
+  try {
+    const current = new URL(`http://${req.headers.host}`);
+    const incoming = new URL(origin);
+    return incoming.hostname === current.hostname && ["5173", "4000", current.port].includes(incoming.port || (incoming.protocol === "https:" ? "443" : "80"));
+  } catch {
+    return false;
+  }
+}
+
+function clientIp(req) {
+  return String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown").split(",")[0].trim();
+}
+
+function isHttps(req) {
+  return req.headers["x-forwarded-proto"] === "https";
+}
+
+function sessionCookie(name, value, req, maxAge) {
+  const secure = isHttps(req) ? "; Secure" : "";
+  return `${name}=${encodeURIComponent(value)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}${secure}`;
+}
+
+function publicCookie(name, value, req, maxAge) {
+  const secure = isHttps(req) ? "; Secure" : "";
+  return `${name}=${encodeURIComponent(value)}; SameSite=Lax; Path=/; Max-Age=${maxAge}${secure}`;
+}
+
+function rateLimit(map, key, limit, windowMs) {
+  const now = Date.now();
+  const entry = map.get(key);
+  if (!entry || entry.resetAt <= now) {
+    map.set(key, { count: 1, resetAt: now + windowMs });
+    return false;
+  }
+  entry.count += 1;
+  return entry.count > limit;
+}
+
+function tooManyLoginFailures(key) {
+  const entry = loginFailures.get(key);
+  return Boolean(entry && entry.resetAt > Date.now() && entry.count >= loginMaxFailures);
+}
+
+function rememberLoginFailure(key) {
+  const now = Date.now();
+  const entry = loginFailures.get(key);
+  if (!entry || entry.resetAt <= now) loginFailures.set(key, { count: 1, resetAt: now + loginWindowMs });
+  else entry.count += 1;
+}
+
+function clearLoginFailures(key) {
+  loginFailures.delete(key);
+}
+
+function logLogin(email, ip, success, reason = "") {
+  db.prepare("INSERT INTO login_events (id, email, ip, success, reason) VALUES (?, ?, ?, ?, ?)")
+    .run(id("log"), String(email || "").toLowerCase(), ip, success ? 1 : 0, reason);
+}
+
+function addAudit(weddingId, userId, role, action, target = "", detail = "") {
+  db.prepare("INSERT INTO audit_events (id, wedding_id, user_id, role, action, target, detail) VALUES (?, ?, ?, ?, ?, ?, ?)")
+    .run(id("aud"), weddingId || "", userId || "", role || "", action, target, detail);
+}
+
+function isPublicMutation(url) {
+  return url.pathname.startsWith("/api/invite/") || url.pathname.startsWith("/api/media/");
+}
+
+function safeDataUpload(dataUrl, allowedPrefixes) {
+  const match = String(dataUrl || "").match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return null;
+  const mimeType = match[1].toLowerCase();
+  if (!allowedPrefixes.some((prefix) => mimeType === prefix || mimeType.startsWith(prefix))) return null;
+  return { mimeType, encoded: match[2], buffer: Buffer.from(match[2], "base64") };
+}
+
+function mediaExtension(mimeType) {
+  if (mimeType.includes("png")) return ".png";
+  if (mimeType.includes("webp")) return ".webp";
+  if (mimeType.includes("mp4")) return ".mp4";
+  if (mimeType.includes("webm")) return ".webm";
+  if (mimeType.includes("quicktime")) return ".mov";
+  if (mimeType.includes("pdf")) return ".pdf";
+  if (mimeType.includes("wordprocessingml")) return ".docx";
+  if (mimeType.includes("msword")) return ".doc";
+  return ".jpg";
+}
+
 function getSession(req) {
   const sessionId = parseCookies(req.headers.cookie).session;
   if (!sessionId) return null;
   const session = db.prepare(`
-    SELECT sessions.id, sessions.expires_at, sessions.active_wedding_id, users.id AS user_id, users.name, users.email, users.is_super_admin
+    SELECT sessions.id, sessions.expires_at, sessions.last_seen_at, sessions.csrf_token, sessions.active_wedding_id, users.id AS user_id, users.name, users.email, users.is_super_admin
     FROM sessions JOIN users ON users.id = sessions.user_id WHERE sessions.id = ?
   `).get(sessionId);
-  if (!session || session.expires_at < Date.now()) {
+  const now = Date.now();
+  if (!session || session.expires_at < now || (session.last_seen_at && now - session.last_seen_at > sessionIdleMs)) {
     if (session) db.prepare("DELETE FROM sessions WHERE id = ?").run(sessionId);
     return null;
   }
+  db.prepare("UPDATE sessions SET last_seen_at = ?, expires_at = ? WHERE id = ?").run(now, Math.min(now + sessionTtlMs, session.expires_at), session.id);
   return session;
 }
 
@@ -411,6 +578,18 @@ function requireAuth(req, res) {
     return null;
   }
   return session;
+}
+
+function requireCsrf(req, res, url) {
+  if (!["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) return true;
+  if (["/api/login", "/api/register", "/api/logout"].includes(url.pathname) || isPublicMutation(url)) return true;
+  const session = getSession(req);
+  const header = String(req.headers["x-csrf-token"] || "");
+  if (!session?.csrf_token || header !== session.csrf_token) {
+    send(res, 403, { message: "Token CSRF invalid." });
+    return false;
+  }
+  return true;
 }
 
 function weddingsForUser(userId) {
@@ -447,6 +626,20 @@ function isSuperAdmin(session) {
   return Boolean(session?.is_super_admin);
 }
 
+function roleRank(role) {
+  return ({ viewer: 1, planner: 2, owner: 3, super_admin: 4 })[role] || 0;
+}
+
+function hasRole(wedding, required) {
+  return roleRank(wedding?.role) >= roleRank(required);
+}
+
+function requireRole(res, wedding, required) {
+  if (hasRole(wedding, required)) return true;
+  send(res, 403, { message: "Nu ai permisiunea necesara pentru aceasta actiune." });
+  return false;
+}
+
 function requireSuperAdmin(req, res) {
   const session = requireAuth(req, res);
   if (!session) return null;
@@ -477,6 +670,7 @@ function guestRow(row, wedding, origin) {
   const phone = String(row.phone || "").replace(/\D/g, "");
   return {
     ...row,
+    meal_choices: JSON.parse(row.meal_choices_json || "[]"),
     inviteUrl,
     whatsappUrl: `https://wa.me/${phone || ""}?text=${encodeURIComponent(message)}`
   };
@@ -504,7 +698,7 @@ function dashboard(wedding, origin, userId = wedding.owner_id) {
       .map((task) => ({ ...task, done: Boolean(task.done) })),
     roomTables: db.prepare("SELECT * FROM room_tables WHERE wedding_id = ?").all(wedding.id),
     team: db.prepare(`
-      SELECT users.id, users.name, users.email, wedding_users.role
+      SELECT users.id, users.name, users.first_name, users.last_name, users.phone, users.email, wedding_users.role
       FROM wedding_users JOIN users ON users.id = wedding_users.user_id
       WHERE wedding_users.wedding_id = ?
       ORDER BY wedding_users.created_at ASC
@@ -564,15 +758,30 @@ function toCsv(rows, columns) {
 
 async function handleApi(req, res, url) {
   const origin = publicOrigin(req);
+  const ip = clientIp(req);
+
+  if (rateLimit(apiHits, ip, apiMaxRequests, apiWindowMs)) {
+    send(res, 429, { message: "Prea multe cereri. Incearca din nou mai tarziu." });
+    return;
+  }
+
+  if (!requireCsrf(req, res, url)) return;
 
   if (req.method === "GET" && url.pathname === "/api/session") {
     const session = getSession(req);
     if (!session) return send(res, 200, { user: null });
+    let csrfToken = session.csrf_token;
+    const extraHeaders = {};
+    if (!csrfToken) {
+      csrfToken = token();
+      db.prepare("UPDATE sessions SET csrf_token = ? WHERE id = ?").run(csrfToken, session.id);
+      extraHeaders["Set-Cookie"] = publicCookie("csrf_token", csrfToken, req, Math.floor(sessionTtlMs / 1000));
+    }
     send(res, 200, {
       user: { id: session.user_id, name: session.name, email: session.email, isSuperAdmin: Boolean(session.is_super_admin) },
       weddings: weddingsForUser(session.user_id),
       activeWeddingId: currentWedding(session)?.id || null
-    });
+    }, extraHeaders);
     return;
   }
 
@@ -580,8 +789,17 @@ async function handleApi(req, res, url) {
     const body = await readBody(req);
     const email = String(body.email || "").trim().toLowerCase();
     const password = String(body.password || "");
-    if (!email || password.length < 6 || !body.couple) {
-      send(res, 422, { message: "Completeaza email, parola de minimum 6 caractere si numele mirilor." });
+    const passwordError = passwordPolicyError(password);
+    if (!email || !body.couple) {
+      send(res, 422, { message: "Completeaza email, parola si numele mirilor." });
+      return;
+    }
+    if (passwordError) {
+      send(res, 422, { message: passwordError });
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      send(res, 422, { message: "Email invalid." });
       return;
     }
     if (db.prepare("SELECT id FROM users WHERE email = ?").get(email)) {
@@ -612,28 +830,43 @@ async function handleApi(req, res, url) {
       token()
     );
     db.prepare("INSERT INTO wedding_users (wedding_id, user_id, role) VALUES (?, ?, 'owner')").run(weddingId, userId);
-    const sessionId = id("ses");
-    db.prepare("INSERT INTO sessions (id, user_id, active_wedding_id, expires_at) VALUES (?, ?, ?, ?)")
-      .run(sessionId, userId, weddingId, Date.now() + sessionTtlMs);
-    send(res, 201, { user: { id: userId, name: String(body.name || body.couple), email } }, {
-      "Set-Cookie": `session=${encodeURIComponent(sessionId)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${Math.floor(sessionTtlMs / 1000)}`
-    });
+    send(res, 201, { ok: true, message: "Contul a fost creat. Te poti conecta." });
     return;
   }
 
   if (req.method === "POST" && url.pathname === "/api/login") {
     const body = await readBody(req);
-    const user = db.prepare("SELECT * FROM users WHERE email = ?").get(String(body.email || "").toLowerCase());
-    if (!user || user.status === "inactive" || !verifyPassword(String(body.password || ""), user)) {
+    const email = String(body.email || "").toLowerCase();
+    const failureKey = `${ip}:${email}`;
+    if (tooManyLoginFailures(failureKey)) {
+      logLogin(email, ip, false, "rate_limited");
+      send(res, 429, { message: "Prea multe incercari. Incearca din nou peste cateva minute." });
+      return;
+    }
+    const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
+    const verification = verifyPassword(String(body.password || ""), user);
+    if (!user || user.status === "inactive" || !verification.ok) {
+      rememberLoginFailure(failureKey);
+      logLogin(email, ip, false, !user ? "unknown_email" : user.status === "inactive" ? "inactive" : "bad_password");
       send(res, 401, { message: "Email sau parola incorecta." });
       return;
     }
+    if (verification.needsRehash) {
+      const { hash, salt } = hashPassword(String(body.password || ""));
+      db.prepare("UPDATE users SET password_hash = ?, salt = ? WHERE id = ?").run(hash, salt, user.id);
+    }
+    clearLoginFailures(failureKey);
+    logLogin(email, ip, true, "");
     const active = weddingsForUser(user.id)[0]?.id || null;
     const sessionId = id("ses");
-    db.prepare("INSERT INTO sessions (id, user_id, active_wedding_id, expires_at) VALUES (?, ?, ?, ?)")
-      .run(sessionId, user.id, active, Date.now() + sessionTtlMs);
+    const csrfToken = token();
+    db.prepare("INSERT INTO sessions (id, user_id, active_wedding_id, csrf_token, expires_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .run(sessionId, user.id, active, csrfToken, Date.now() + sessionTtlMs, Date.now());
     send(res, 200, { user: { id: user.id, name: user.name, email: user.email, isSuperAdmin: Boolean(user.is_super_admin) } }, {
-      "Set-Cookie": `session=${encodeURIComponent(sessionId)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${Math.floor(sessionTtlMs / 1000)}`
+      "Set-Cookie": [
+        sessionCookie("session", sessionId, req, Math.floor(sessionTtlMs / 1000)),
+        publicCookie("csrf_token", csrfToken, req, Math.floor(sessionTtlMs / 1000))
+      ]
     });
     return;
   }
@@ -641,7 +874,7 @@ async function handleApi(req, res, url) {
   if (req.method === "POST" && url.pathname === "/api/logout") {
     const cookies = parseCookies(req.headers.cookie);
     if (cookies.session) db.prepare("DELETE FROM sessions WHERE id = ?").run(cookies.session);
-    send(res, 200, { ok: true }, { "Set-Cookie": "session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0" });
+    send(res, 200, { ok: true }, { "Set-Cookie": ["session=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0", "csrf_token=; SameSite=Lax; Path=/; Max-Age=0"] });
     return;
   }
 
@@ -649,7 +882,7 @@ async function handleApi(req, res, url) {
     const inviteToken = url.pathname.split("/").pop();
     const guest = db.prepare("SELECT * FROM guests WHERE invitation_token = ?").get(inviteToken);
     if (!guest) return send(res, 404, { message: "Invitatia nu a fost gasita." });
-    send(res, 200, { wedding: parseWedding(db.prepare("SELECT * FROM weddings WHERE id = ?").get(guest.wedding_id)), guest });
+    send(res, 200, { wedding: parseWedding(db.prepare("SELECT * FROM weddings WHERE id = ?").get(guest.wedding_id)), guest: { ...guest, meal_choices: JSON.parse(guest.meal_choices_json || "[]") } });
     return;
   }
 
@@ -658,13 +891,18 @@ async function handleApi(req, res, url) {
     const body = await readBody(req);
     const guest = db.prepare("SELECT * FROM guests WHERE invitation_token = ?").get(inviteToken);
     if (!guest) return send(res, 404, { message: "Invitatia nu a fost gasita." });
-    if (guest.response_locked || guest.status !== "In asteptare") return send(res, 409, { message: "Raspunsul a fost deja trimis si nu mai poate fi modificat." });
-    const status = ["Confirmat", "Refuzat", "In asteptare"].includes(body.status) ? body.status : "In asteptare";
-    db.prepare(`
-      UPDATE guests SET status = ?, seats = ?, meal_choice = ?, allergies = ?, guest_message = ?, response_locked = 1, updated_at = CURRENT_TIMESTAMP
-      WHERE invitation_token = ?
-    `).run(status, Math.max(1, Math.min(10, Number(body.seats) || 1)), String(body.meal_choice || ""), String(body.allergies || ""), String(body.guest_message || ""), inviteToken);
+    if (guest.status !== "In asteptare") return send(res, 409, { message: "Raspunsul a fost deja trimis si nu mai poate fi modificat." });
+    const status = ["Confirmat", "Refuzat"].includes(body.status) ? body.status : "Confirmat";
     const seats = Math.max(1, Math.min(10, Number(body.seats) || 1));
+    const mealChoices = Array.isArray(body.meal_choices)
+      ? body.meal_choices.slice(0, seats).map((item) => String(item || "").trim())
+      : [];
+    while (mealChoices.length < seats) mealChoices.push("");
+    const primaryMeal = mealChoices.find(Boolean) || String(body.meal_choice || "");
+    db.prepare(`
+      UPDATE guests SET status = ?, seats = ?, meal_choice = ?, meal_choices_json = ?, allergies = ?, guest_message = ?, response_locked = 1, updated_at = CURRENT_TIMESTAMP
+      WHERE invitation_token = ?
+    `).run(status, seats, primaryMeal, JSON.stringify(mealChoices), String(body.allergies || ""), String(body.guest_message || ""), inviteToken);
     const activityType = status === "Confirmat" ? "rsvp_confirmed" : status === "Refuzat" ? "rsvp_declined" : "rsvp";
     const activityTitle = status === "Confirmat" ? `${guest.name} a acceptat invitatia` : `${guest.name} a trimis raspuns`;
     addActivity(guest.wedding_id, activityType, activityTitle, `${status} - ${seats} locuri`);
@@ -690,16 +928,14 @@ async function handleApi(req, res, url) {
     if (!existsSync(targetDir)) mkdirSync(targetDir, { recursive: true });
     let savedFiles = 0;
     for (const file of files) {
-      const match = String(file.dataUrl || "").match(/^data:([^;]+);base64,(.+)$/);
-      if (!match) continue;
-      const [, mimeType, encoded] = match;
-      const buffer = Buffer.from(encoded, "base64");
-      const cleanName = basename(String(file.name || "fisier").replace(/[^\w.\- ]/g, "_"));
-      const fileName = `${Date.now()}_${cleanName}`;
+      const upload = safeDataUpload(file.dataUrl, ["image/", "video/"]);
+      if (!upload) continue;
+      const cleanName = basename(String(file.name || "fisier").replace(/[^\w.\- ]/g, "_")).replace(/\.(exe|js|html?|bat|cmd|ps1)$/i, "");
+      const fileName = `${id("media")}_${cleanName}${mediaExtension(upload.mimeType)}`;
       const filePath = join(targetDir, fileName);
-      await writeFile(filePath, buffer);
+      await writeFile(filePath, upload.buffer);
       db.prepare("INSERT INTO media_uploads (id, wedding_id, guest_name, file_name, file_path, mime_type, size) VALUES (?, ?, ?, ?, ?, ?, ?)")
-        .run(id("upl"), wedding.id, String(body.guest_name || ""), cleanName, filePath, mimeType, buffer.length);
+        .run(id("upl"), wedding.id, String(body.guest_name || ""), cleanName, filePath, upload.mimeType, upload.buffer.length);
       savedFiles += 1;
     }
     if (savedFiles) addActivity(wedding.id, "upload", `${body.guest_name || "Un invitat"} a incarcat fisiere`, `${savedFiles} fisiere noi in galerie`);
@@ -730,8 +966,10 @@ async function handleApi(req, res, url) {
     const body = await readBody(req);
     const email = String(body.email || "").trim().toLowerCase();
     if (!email || !body.couple) return send(res, 422, { message: "Email si nume miri sunt obligatorii." });
+    const passwordError = passwordPolicyError(String(body.password || ""));
+    if (passwordError) return send(res, 422, { message: passwordError });
     if (db.prepare("SELECT id FROM users WHERE email = ?").get(email)) return send(res, 409, { message: "Clientul exista deja." });
-    const password = String(body.password || "client123");
+    const password = String(body.password);
     const { hash, salt } = hashPassword(password);
     const userId = id("usr");
     const weddingId = id("wed");
@@ -748,8 +986,12 @@ async function handleApi(req, res, url) {
     if (!session) return;
     const userId = url.pathname.split("/")[4];
     const body = await readBody(req);
-    const { hash, salt } = hashPassword(String(body.password || "client123"));
+    const passwordError = passwordPolicyError(String(body.password || ""));
+    if (passwordError) return send(res, 422, { message: passwordError });
+    const { hash, salt } = hashPassword(String(body.password));
     db.prepare("UPDATE users SET password_hash = ?, salt = ? WHERE id = ?").run(hash, salt, userId);
+    db.prepare("DELETE FROM sessions WHERE user_id = ?").run(userId);
+    addAudit("", session.user_id, "super_admin", "reset_password", userId, "");
     send(res, 200, adminDashboard(origin));
     return;
   }
@@ -797,44 +1039,52 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/hero-upload") {
-    const body = await readBody(req, 20_000_000);
-    const match = String(body.dataUrl || "").match(/^data:([^;]+);base64,(.+)$/);
-    if (!match || !match[1].startsWith("image/")) return send(res, 422, { message: "Incarca o imagine valida." });
-    const [, mimeType, encoded] = match;
-    const ext = mimeType.includes("png") ? ".png" : mimeType.includes("webp") ? ".webp" : ".jpg";
+    if (!requireRole(res, wedding, "owner")) return;
+    const body = await readBody(req, 80_000_000);
+    const upload = safeDataUpload(body.dataUrl, ["image/", "video/"]);
+    if (!upload) return send(res, 422, { message: "Incarca o imagine sau un video valid." });
+    const ext = mediaExtension(upload.mimeType);
     const targetDir = join(uploadsDir, wedding.id, "hero");
     if (!existsSync(targetDir)) mkdirSync(targetDir, { recursive: true });
-    const fileName = `hero_${Date.now()}${ext}`;
+    const slot = body.slot === "secondary" ? "secondary" : "hero";
+    const fileName = `${slot}_${Date.now()}${ext}`;
     const filePath = join(targetDir, fileName);
-    await writeFile(filePath, Buffer.from(encoded, "base64"));
+    await writeFile(filePath, upload.buffer);
     const heroUrl = `/api/public-media/${wedding.id}/${fileName}`;
-    db.prepare("UPDATE weddings SET hero_image_url = ? WHERE id = ?").run(heroUrl, wedding.id);
+    if (slot === "secondary") {
+      db.prepare("UPDATE weddings SET invite_secondary_image_url = ? WHERE id = ?").run(heroUrl, wedding.id);
+    } else {
+      db.prepare("UPDATE weddings SET hero_image_url = ? WHERE id = ?").run(heroUrl, wedding.id);
+    }
+    addAudit(wedding.id, session.user_id, wedding.role, "upload_invitation_media", slot, heroUrl);
     send(res, 200, dashboard(parseWedding(db.prepare("SELECT * FROM weddings WHERE id = ?").get(wedding.id)), origin, session.user_id));
     return;
   }
 
   if (req.method === "POST" && url.pathname === "/api/profile-upload") {
+    if (!requireRole(res, wedding, "owner")) return;
     const body = await readBody(req, 20_000_000);
-    const match = String(body.dataUrl || "").match(/^data:([^;]+);base64,(.+)$/);
-    if (!match || !match[1].startsWith("image/")) return send(res, 422, { message: "Incarca o imagine valida." });
-    const [, mimeType, encoded] = match;
-    const ext = mimeType.includes("png") ? ".png" : mimeType.includes("webp") ? ".webp" : ".jpg";
+    const upload = safeDataUpload(body.dataUrl, ["image/"]);
+    if (!upload) return send(res, 422, { message: "Incarca o imagine valida." });
+    const ext = mediaExtension(upload.mimeType);
     const targetDir = join(uploadsDir, wedding.id, "profile");
     if (!existsSync(targetDir)) mkdirSync(targetDir, { recursive: true });
     const fileName = `profile_${Date.now()}${ext}`;
     const filePath = join(targetDir, fileName);
-    await writeFile(filePath, Buffer.from(encoded, "base64"));
+    await writeFile(filePath, upload.buffer);
     const profileUrl = `/api/public-media/${wedding.id}/profile/${fileName}`;
     db.prepare("UPDATE weddings SET profile_image_url = ? WHERE id = ?").run(profileUrl, wedding.id);
+    addAudit(wedding.id, session.user_id, wedding.role, "upload_profile_image", "wedding", profileUrl);
     send(res, 200, dashboard(parseWedding(db.prepare("SELECT * FROM weddings WHERE id = ?").get(wedding.id)), origin, session.user_id));
     return;
   }
 
   if (req.method === "PUT" && url.pathname === "/api/settings") {
+    if (!requireRole(res, wedding, "owner")) return;
     const body = await readBody(req);
     db.prepare(`
       UPDATE weddings SET couple = ?, wedding_date = ?, wedding_time = ?, venue = ?, venue_address = ?, map_url = ?, dress_code = ?,
-      hero_image_url = ?, profile_image_url = ?, theme_color = ?, invitation_template = ?, invite_intro = ?, menu_options_json = ?, program_json = ?, whatsapp_message = ? WHERE id = ?
+      hero_image_url = ?, invite_secondary_image_url = ?, profile_image_url = ?, theme_color = ?, invitation_template = ?, invite_intro = ?, menu_options_json = ?, program_json = ?, whatsapp_message = ? WHERE id = ?
     `).run(
       String(body.couple || "Nunta"),
       String(body.wedding_date || ""),
@@ -844,64 +1094,152 @@ async function handleApi(req, res, url) {
       String(body.map_url || ""),
       String(body.dress_code || ""),
       String(body.hero_image_url || ""),
+      String(body.invite_secondary_image_url || ""),
       String(body.profile_image_url || ""),
       ["sage", "rose", "navy", "dark"].includes(body.theme_color) ? body.theme_color : "sage",
-      "custom",
+      String(body.invitation_template || "custom"),
       String(body.invite_intro || ""),
       JSON.stringify((Array.isArray(body.menu_options) ? body.menu_options : []).filter(Boolean)),
       JSON.stringify(Array.isArray(body.program) ? body.program : []),
       String(body.whatsapp_message || "Buna, {name}! Confirma aici: {link}"),
       wedding.id
     );
+    addAudit(wedding.id, session.user_id, wedding.role, "update_settings", "wedding", wedding.id);
     send(res, 200, dashboard(parseWedding(db.prepare("SELECT * FROM weddings WHERE id = ?").get(wedding.id)), origin, session.user_id));
     return;
   }
 
   if (req.method === "POST" && url.pathname === "/api/team") {
+    if (!requireRole(res, wedding, "owner")) return;
     const body = await readBody(req);
     const email = String(body.email || "").trim().toLowerCase();
-    const role = ["owner", "planner", "viewer"].includes(body.role) ? body.role : "viewer";
-    let user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
-    if (!user) {
-      const { hash, salt } = hashPassword("parola123");
-      db.prepare("INSERT INTO users (id, name, email, password_hash, salt) VALUES (?, ?, ?, ?, ?)")
-        .run(id("usr"), String(body.name || email), email, hash, salt);
-      user = db.prepare("SELECT * FROM users WHERE email = ?").get(email);
-    }
-    db.prepare("INSERT OR REPLACE INTO wedding_users (wedding_id, user_id, role) VALUES (?, ?, ?)").run(wedding.id, user.id, role);
+    const password = String(body.password || "");
+    const role = ["planner", "viewer"].includes(body.role) ? body.role : "viewer";
+    const firstName = String(body.first_name || "").trim();
+    const lastName = String(body.last_name || "").trim();
+    const displayName = `${firstName} ${lastName}`.trim() || String(body.name || email);
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return send(res, 422, { message: "Email invalid." });
+    const passwordError = passwordPolicyError(password);
+    if (passwordError) return send(res, 422, { message: passwordError });
+    if (db.prepare("SELECT id FROM users WHERE email = ?").get(email)) return send(res, 409, { message: "Exista deja un cont cu acest email." });
+    const userId = id("usr");
+    const { hash, salt } = hashPassword(password);
+    db.prepare("INSERT INTO users (id, name, first_name, last_name, phone, email, password_hash, salt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+      .run(userId, displayName, firstName, lastName, String(body.phone || ""), email, hash, salt);
+    db.prepare("INSERT INTO wedding_users (wedding_id, user_id, role) VALUES (?, ?, ?)").run(wedding.id, userId, role);
+    addAudit(wedding.id, session.user_id, wedding.role, "create_team_account", userId, `${role}:${email}`);
     send(res, 201, dashboard(wedding, origin, session.user_id));
+    return;
+  }
+
+  if (req.method === "PATCH" && url.pathname.startsWith("/api/team/")) {
+    if (!requireRole(res, wedding, "owner")) return;
+    const body = await readBody(req);
+    const userId = url.pathname.split("/").pop();
+    const link = db.prepare("SELECT role FROM wedding_users WHERE wedding_id = ? AND user_id = ?").get(wedding.id, userId);
+    if (!link || link.role === "owner") return send(res, 404, { message: "Contul nu poate fi editat." });
+    const email = String(body.email || "").trim().toLowerCase();
+    const existing = db.prepare("SELECT id FROM users WHERE email = ? AND id != ?").get(email, userId);
+    const role = ["planner", "viewer"].includes(body.role) ? body.role : link.role;
+    const firstName = String(body.first_name || "").trim();
+    const lastName = String(body.last_name || "").trim();
+    const displayName = `${firstName} ${lastName}`.trim() || String(body.name || email);
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return send(res, 422, { message: "Email invalid." });
+    if (existing) return send(res, 409, { message: "Exista deja un cont cu acest email." });
+    if (String(body.password || "")) {
+      const passwordError = passwordPolicyError(String(body.password));
+      if (passwordError) return send(res, 422, { message: passwordError });
+    }
+    db.prepare("UPDATE users SET name = ?, first_name = ?, last_name = ?, phone = ?, email = ? WHERE id = ?")
+      .run(displayName, firstName, lastName, String(body.phone || ""), email, userId);
+    db.prepare("UPDATE wedding_users SET role = ? WHERE wedding_id = ? AND user_id = ?").run(role, wedding.id, userId);
+    if (String(body.password || "")) {
+      const { hash, salt } = hashPassword(String(body.password));
+      db.prepare("UPDATE users SET password_hash = ?, salt = ? WHERE id = ?").run(hash, salt, userId);
+      db.prepare("DELETE FROM sessions WHERE user_id = ?").run(userId);
+    }
+    addAudit(wedding.id, session.user_id, wedding.role, "update_team_account", userId, `${role}:${email}`);
+    send(res, 200, dashboard(wedding, origin, session.user_id));
     return;
   }
 
   if (req.method === "POST" && url.pathname === "/api/suppliers") {
+    if (!requireRole(res, wedding, "planner")) return;
     const body = await readBody(req, 20_000_000);
     let contractName = "";
     let contractPath = "";
-    const match = String(body.contract_data_url || "").match(/^data:([^;]+);base64,(.+)$/);
-    if (match) {
+    const upload = safeDataUpload(body.contract_data_url, ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/"]);
+    if (upload) {
       const targetDir = join(uploadsDir, wedding.id, "contracts");
       if (!existsSync(targetDir)) mkdirSync(targetDir, { recursive: true });
-      contractName = basename(String(body.contract_name || "contract.pdf").replace(/[^\w.\- ]/g, "_"));
-      contractPath = join(targetDir, `${Date.now()}_${contractName}`);
-      await writeFile(contractPath, Buffer.from(match[2], "base64"));
+      const original = basename(String(body.contract_name || "contract").replace(/[^\w.\- ]/g, "_"));
+      contractName = `${id("contract")}_${original.replace(/\.(exe|js|html?|bat|cmd|ps1)$/i, "")}${mediaExtension(upload.mimeType)}`;
+      contractPath = join(targetDir, contractName);
+      await writeFile(contractPath, upload.buffer);
+    } else if (body.contract_data_url) {
+      return send(res, 422, { message: "Contractul trebuie sa fie PDF, DOC, DOCX sau imagine." });
     }
     db.prepare("INSERT INTO suppliers (id, wedding_id, name, category, phone, email, contract_name, contract_path, advance, total, due, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
       .run(id("sup"), wedding.id, String(body.name || "Furnizor"), String(body.category || ""), String(body.phone || ""), String(body.email || ""), contractName, contractPath, Number(body.advance) || 0, Number(body.total) || 0, String(body.due || ""), String(body.notes || ""));
     addActivity(wedding.id, "supplier", `Furnizor adaugat: ${String(body.name || "Furnizor")}`, `Total contract: ${Number(body.total) || 0} RON`);
+    addAudit(wedding.id, session.user_id, wedding.role, "create_supplier", "supplier", String(body.name || ""));
     send(res, 201, dashboard(wedding, origin, session.user_id));
     return;
   }
 
+  if (req.method === "PATCH" && url.pathname.startsWith("/api/suppliers/")) {
+    if (!requireRole(res, wedding, "planner")) return;
+    const supplierId = url.pathname.split("/").pop();
+    const current = db.prepare("SELECT * FROM suppliers WHERE id = ? AND wedding_id = ?").get(supplierId, wedding.id);
+    if (!current) return send(res, 404, { message: "Furnizorul nu exista." });
+    const body = await readBody(req, 20_000_000);
+    let contractName = current.contract_name || "";
+    let contractPath = current.contract_path || "";
+    const upload = safeDataUpload(body.contract_data_url, ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "image/"]);
+    if (upload) {
+      const targetDir = join(uploadsDir, wedding.id, "contracts");
+      if (!existsSync(targetDir)) mkdirSync(targetDir, { recursive: true });
+      const original = basename(String(body.contract_name || "contract").replace(/[^\w.\- ]/g, "_"));
+      contractName = `${id("contract")}_${original.replace(/\.(exe|js|html?|bat|cmd|ps1)$/i, "")}${mediaExtension(upload.mimeType)}`;
+      contractPath = join(targetDir, contractName);
+      await writeFile(contractPath, upload.buffer);
+    } else if (body.contract_data_url) {
+      return send(res, 422, { message: "Contractul trebuie sa fie PDF, DOC, DOCX sau imagine." });
+    }
+    db.prepare(`
+      UPDATE suppliers SET name = ?, phone = ?, email = ?, contract_name = ?, contract_path = ?, advance = ?, total = ?, notes = ?
+      WHERE id = ? AND wedding_id = ?
+    `).run(
+      String(body.name || "Furnizor"),
+      String(body.phone || ""),
+      String(body.email || ""),
+      contractName,
+      contractPath,
+      Number(body.advance) || 0,
+      Number(body.total) || 0,
+      String(body.notes || ""),
+      supplierId,
+      wedding.id
+    );
+    addActivity(wedding.id, "supplier", `Furnizor editat: ${String(body.name || current.name)}`, `Total contract: ${Number(body.total) || 0} RON`);
+    addAudit(wedding.id, session.user_id, wedding.role, "update_supplier", supplierId, String(body.name || current.name));
+    send(res, 200, dashboard(wedding, origin, session.user_id));
+    return;
+  }
+
   if (req.method === "DELETE" && url.pathname.startsWith("/api/suppliers/")) {
+    if (!requireRole(res, wedding, "planner")) return;
     const supplierId = url.pathname.split("/").pop();
     const supplier = db.prepare("SELECT name FROM suppliers WHERE id = ? AND wedding_id = ?").get(supplierId, wedding.id);
     db.prepare("DELETE FROM suppliers WHERE id = ? AND wedding_id = ?").run(supplierId, wedding.id);
     if (supplier) addActivity(wedding.id, "supplier", `Furnizor sters: ${supplier.name}`, "");
+    addAudit(wedding.id, session.user_id, wedding.role, "delete_supplier", supplierId, supplier?.name || "");
     send(res, 200, dashboard(wedding, origin, session.user_id));
     return;
   }
 
   if (req.method === "PATCH" && url.pathname.startsWith("/api/room-tables/")) {
+    if (!requireRole(res, wedding, "planner")) return;
     const tableId = url.pathname.split("/").pop();
     const body = await readBody(req);
     db.prepare("INSERT OR REPLACE INTO room_tables (table_id, wedding_id, x, y, shape) VALUES (?, ?, ?, ?, ?)")
@@ -911,33 +1249,54 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/guests") {
+    if (!requireRole(res, wedding, "planner")) return;
     const body = await readBody(req);
     db.prepare(`
       INSERT INTO guests (id, wedding_id, name, phone, side, group_name, status, meal_choice, allergies, seats, invitation_token, table_id)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(id("gst"), wedding.id, String(body.name || "Invitat"), String(body.phone || ""), String(body.side || "Comun"), String(body.group_name || ""), String(body.status || "In asteptare"), String(body.meal_choice || ""), String(body.allergies || ""), Math.max(1, Number(body.seats) || 1), token(), String(body.table_id || ""));
+    addAudit(wedding.id, session.user_id, wedding.role, "create_guest", "guest", String(body.name || "Invitat"));
     send(res, 201, dashboard(wedding, origin, session.user_id));
     return;
   }
 
   if (req.method === "PATCH" && url.pathname.startsWith("/api/guests/")) {
+    if (!requireRole(res, wedding, "planner")) return;
     const body = await readBody(req);
     const guestId = url.pathname.split("/").pop();
+    const current = db.prepare("SELECT * FROM guests WHERE id = ? AND wedding_id = ?").get(guestId, wedding.id);
+    if (!current) return send(res, 404, { message: "Invitatul nu exista." });
     db.prepare(`
-      UPDATE guests SET status = COALESCE(?, status), table_id = ?, invitation_sent = COALESCE(?, invitation_sent), updated_at = CURRENT_TIMESTAMP
+      UPDATE guests SET name = ?, phone = ?, side = ?, status = ?, meal_choice = ?, allergies = ?, seats = ?, table_id = ?, invitation_sent = COALESCE(?, invitation_sent), updated_at = CURRENT_TIMESTAMP
       WHERE id = ? AND wedding_id = ?
-    `).run(body.status ?? null, String(body.table_id || ""), body.invitation_sent === undefined ? null : Number(Boolean(body.invitation_sent)), guestId, wedding.id);
+    `).run(
+      body.name === undefined ? current.name : String(body.name || "Invitat"),
+      body.phone === undefined ? current.phone : String(body.phone || ""),
+      body.side === undefined ? current.side : String(body.side || "Comun"),
+      body.status === undefined ? current.status : String(body.status || "In asteptare"),
+      body.meal_choice === undefined ? current.meal_choice : String(body.meal_choice || ""),
+      body.allergies === undefined ? current.allergies : String(body.allergies || ""),
+      body.seats === undefined ? current.seats : Math.max(1, Number(body.seats) || 1),
+      body.table_id === undefined ? current.table_id : String(body.table_id || ""),
+      body.invitation_sent === undefined ? null : Number(Boolean(body.invitation_sent)),
+      guestId,
+      wedding.id
+    );
+    addAudit(wedding.id, session.user_id, wedding.role, "update_guest", guestId, body.name === undefined ? current.name : String(body.name || "Invitat"));
     send(res, 200, dashboard(wedding, origin, session.user_id));
     return;
   }
 
   if (req.method === "DELETE" && url.pathname.startsWith("/api/guests/")) {
+    if (!requireRole(res, wedding, "planner")) return;
     db.prepare("DELETE FROM guests WHERE id = ? AND wedding_id = ?").run(url.pathname.split("/").pop(), wedding.id);
+    addAudit(wedding.id, session.user_id, wedding.role, "delete_guest", url.pathname.split("/").pop(), "");
     send(res, 200, dashboard(wedding, origin, session.user_id));
     return;
   }
 
   if (req.method === "POST" && url.pathname === "/api/tables") {
+    if (!requireRole(res, wedding, "planner")) return;
     const body = await readBody(req);
     db.prepare("INSERT INTO seating_tables (id, wedding_id, name, capacity, notes) VALUES (?, ?, ?, ?, ?)")
       .run(id("tbl"), wedding.id, String(body.name || "Masa"), Math.max(1, Number(body.capacity) || 8), String(body.notes || ""));
@@ -946,6 +1305,7 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "DELETE" && url.pathname.startsWith("/api/tables/")) {
+    if (!requireRole(res, wedding, "planner")) return;
     const tableId = url.pathname.split("/").pop();
     db.prepare("UPDATE guests SET table_id = '' WHERE table_id = ? AND wedding_id = ?").run(tableId, wedding.id);
     db.prepare("DELETE FROM seating_tables WHERE id = ? AND wedding_id = ?").run(tableId, wedding.id);
@@ -954,6 +1314,7 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/budget") {
+    if (!requireRole(res, wedding, "planner")) return;
     const body = await readBody(req);
     db.prepare("INSERT INTO budget_items (id, wedding_id, item, supplier, planned, paid, status, due) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
       .run(id("bdg"), wedding.id, String(body.item || "Element"), String(body.supplier || ""), Number(body.planned) || 0, Number(body.paid) || 0, String(body.status || "De platit"), String(body.due || ""));
@@ -962,12 +1323,14 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "DELETE" && url.pathname.startsWith("/api/budget/")) {
+    if (!requireRole(res, wedding, "planner")) return;
     db.prepare("DELETE FROM budget_items WHERE id = ? AND wedding_id = ?").run(url.pathname.split("/").pop(), wedding.id);
     send(res, 200, dashboard(wedding, origin, session.user_id));
     return;
   }
 
   if (req.method === "POST" && url.pathname === "/api/tasks") {
+    if (!requireRole(res, wedding, "planner")) return;
     const body = await readBody(req);
     db.prepare("INSERT INTO tasks (id, wedding_id, title, due, owner, stage, priority, done) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
       .run(id("tsk"), wedding.id, String(body.title || "Sarcina"), String(body.due || ""), String(body.owner || "Amandoi"), String(body.stage || "General"), String(body.priority || "Medie"), body.done ? 1 : 0);
@@ -976,6 +1339,7 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "PATCH" && url.pathname.startsWith("/api/tasks/")) {
+    if (!requireRole(res, wedding, "planner")) return;
     const body = await readBody(req);
     db.prepare("UPDATE tasks SET done = ? WHERE id = ? AND wedding_id = ?").run(body.done ? 1 : 0, url.pathname.split("/").pop(), wedding.id);
     send(res, 200, dashboard(wedding, origin, session.user_id));
@@ -983,6 +1347,7 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "DELETE" && url.pathname.startsWith("/api/tasks/")) {
+    if (!requireRole(res, wedding, "planner")) return;
     db.prepare("DELETE FROM tasks WHERE id = ? AND wedding_id = ?").run(url.pathname.split("/").pop(), wedding.id);
     send(res, 200, dashboard(wedding, origin, session.user_id));
     return;
@@ -998,12 +1363,14 @@ async function handleApi(req, res, url) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/media-uploads/seen") {
+    if (!requireRole(res, wedding, "planner")) return;
     db.prepare("UPDATE media_uploads SET seen_at = CURRENT_TIMESTAMP WHERE wedding_id = ? AND seen_at IS NULL").run(wedding.id);
     send(res, 200, dashboard(wedding, origin, session.user_id));
     return;
   }
 
   if (req.method === "POST" && url.pathname === "/api/rsvp-acceptances/seen") {
+    if (!requireRole(res, wedding, "planner")) return;
     db.prepare("UPDATE activity_events SET seen_at = CURRENT_TIMESTAMP WHERE wedding_id = ? AND type = 'rsvp_confirmed' AND seen_at IS NULL").run(wedding.id);
     send(res, 200, dashboard(wedding, origin, session.user_id));
     return;
@@ -1033,17 +1400,26 @@ async function handleApi(req, res, url) {
     if (type === "guests") {
       const guests = listGuests(wedding, origin).map((guest) => {
         const [firstName, ...lastName] = String(guest.name || "").split(" ");
-        return { ...guest, first_name: firstName || "", last_name: lastName.join(" ") };
+        const mealDetails = (Array.isArray(guest.meal_choices) && guest.meal_choices.length ? guest.meal_choices : [guest.meal_choice || ""])
+          .map((choice, index) => `${index + 1}. ${choice || "Neales"}`)
+          .join("; ");
+        return { ...guest, first_name: firstName || "", last_name: lastName.join(" "), meal_details: mealDetails };
       });
       return sendText(res, 200, toCsv(guests, [
         { key: "first_name", label: "Nume" }, { key: "last_name", label: "Prenume" }, { key: "phone", label: "Telefon" },
-        { key: "status", label: "Status" }, { key: "seats", label: "Locuri" }, { key: "meal_choice", label: "Meniu" },
+        { key: "status", label: "Status" }, { key: "seats", label: "Locuri" }, { key: "meal_details", label: "Meniu" },
         { key: "allergies", label: "Alergii" }, { key: "table_label", label: "Masa" }, { key: "inviteUrl", label: "Link invitatie" }
       ]), "invitati.csv");
     }
     if (type === "menu") {
-      return sendText(res, 200, toCsv(listGuests(wedding, origin).filter((guest) => guest.status === "Confirmat"), [
-        { key: "name", label: "Nume" }, { key: "seats", label: "Locuri" }, { key: "meal_choice", label: "Meniu" }, { key: "allergies", label: "Alergii" }, { key: "guest_message", label: "Mesaj" }
+      const guests = listGuests(wedding, origin).filter((guest) => guest.status === "Confirmat").map((guest) => ({
+        ...guest,
+        meal_details: (Array.isArray(guest.meal_choices) && guest.meal_choices.length ? guest.meal_choices : [guest.meal_choice || ""])
+          .map((choice, index) => `${index + 1}. ${choice || "Neales"}`)
+          .join("; ")
+      }));
+      return sendText(res, 200, toCsv(guests, [
+        { key: "name", label: "Nume" }, { key: "seats", label: "Locuri" }, { key: "meal_details", label: "Meniu" }, { key: "allergies", label: "Alergii" }, { key: "guest_message", label: "Mesaj" }
       ]), "meniuri.csv");
     }
     if (type === "tables") {
@@ -1142,9 +1518,23 @@ async function handleApi(req, res, url) {
       return;
     }
     if (type === "budget") {
-      return sendText(res, 200, toCsv(dashboard(wedding, origin).budget, [
-        { key: "item", label: "Element" }, { key: "supplier", label: "Furnizor" }, { key: "planned", label: "Planificat" }, { key: "paid", label: "Platit" }, { key: "status", label: "Status" }, { key: "due", label: "Scadenta" }
-      ]), "buget.csv");
+      const rows = db.prepare("SELECT name, phone, email, contract_name, advance, total, notes, created_at FROM suppliers WHERE wedding_id = ? ORDER BY created_at DESC").all(wedding.id)
+        .map((supplier) => ({
+          ...supplier,
+          contact: [supplier.phone, supplier.email].filter(Boolean).join(" / "),
+          remaining: Math.max(0, Number(supplier.total || 0) - Number(supplier.advance || 0)),
+          status: Number(supplier.advance || 0) >= Number(supplier.total || 0) && Number(supplier.total || 0) > 0 ? "Achitat" : Number(supplier.advance || 0) > 0 ? "Avans" : "De platit"
+        }));
+      return sendText(res, 200, toCsv(rows, [
+        { key: "name", label: "Furnizor" },
+        { key: "contact", label: "Contact" },
+        { key: "advance", label: "Avans platit" },
+        { key: "total", label: "Total contract" },
+        { key: "remaining", label: "De plata" },
+        { key: "status", label: "Status" },
+        { key: "contract_name", label: "Contract" },
+        { key: "notes", label: "Observatii" }
+      ]), "costuri.csv");
     }
     if (type === "tasks") {
       return sendText(res, 200, toCsv(dashboard(wedding, origin).tasks, [
@@ -1164,7 +1554,10 @@ const mimeTypes = {
   ".png": "image/png",
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
-  ".webp": "image/webp"
+  ".webp": "image/webp",
+  ".mp4": "video/mp4",
+  ".webm": "video/webm",
+  ".mov": "video/quicktime"
 };
 
 async function serveStatic(req, res, url) {
@@ -1175,12 +1568,12 @@ async function serveStatic(req, res, url) {
   const safePath = filePath.startsWith(distDir) ? filePath : join(distDir, "index.html");
   try {
     const file = await readFile(safePath);
-    res.writeHead(200, { "Content-Type": mimeTypes[extname(safePath)] || "application/octet-stream" });
+    res.writeHead(200, securityHeaders({ "Content-Type": mimeTypes[extname(safePath)] || "application/octet-stream", "Cache-Control": "public, max-age=3600" }));
     res.end(file);
   } catch {
     try {
       const fallback = await readFile(join(distDir, "index.html"));
-      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      res.writeHead(200, securityHeaders({ "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" }));
       res.end(fallback);
     } catch {
       send(res, 200, { message: "API pornit. Ruleaza si `npm run dev` pentru interfata React." });
@@ -1191,6 +1584,8 @@ async function serveStatic(req, res, url) {
 createServer(async (req, res) => {
   const url = new URL(req.url || "/", `http://${req.headers.host}`);
   try {
+    if (!isAllowedOrigin(req)) return send(res, 403, { message: "Origine nepermisa." });
+    if (req.method === "OPTIONS") return send(res, 204, null);
     if (url.pathname.startsWith("/api/")) return await handleApi(req, res, url);
     await serveStatic(req, res, url);
   } catch (error) {
