@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <title>Save the Date – Minerva & Virgil</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Montserrat:wght@300;400&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+  /* paleta (din imagine) */
+  --light-gray:      #EAEAEA;
+  --ivory:           #F8F5E9;
+  --soft-sand:       #E8DCC0;
+  --champagne-beige: #E4CDA7;
+  --warm-honey:      #D6B370;
+
+  --warm-greige:     #B8B5AF;
+  --sage-green:      #A8B2A1;
+  --warm-taupe:      #9C8F84;
+  --blush-nude:      #E6CFC2;
+  --caramel-soft:    #C89A6A;
+
+  /* folosite în pagină */
+  --paper-main: var(--ivory);
+  --paper-alt:  var(--light-gray);
+  --ink: #222;
+  --muted: #666;
+
+  /* accent recomandat din paletă */
+  --accent: var(--champagne-beige);
+  --accent-strong: var(--warm-honey);
+}
+
+    * { box-sizing: border-box; margin:0; padding:0 }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: "Montserrat", sans-serif;
+      color: var(--ink);
+      background: var(--paper-main);
+    }
+
+    section { padding: 120px 6vw; }
+
+    h1, h2, h3 {
+      font-family: "Playfair Display", serif;
+      letter-spacing: .15em;
+      font-weight: 400;
+    }
+
+    .section-main { background: var(--paper-main); }
+    .section-alt  { background: var(--paper-alt); }
+
+    /* HERO */
+
+    .hero {
+      min-height: 100vh;
+      width: 100%;
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      overflow: hidden;
+      color: white;
+      padding: 0 6vw;
+    }
+
+    .bg-video {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      z-index: -2;
+    }
+
+    .hero::after {
+      content:"";
+      position:absolute;
+      inset:0;
+      background: rgba(0,0,0,.32);
+      z-index:-1;
+    }
+
+    .hero-content {
+      max-width: 760px;
+      padding: 40px 20px 80px;
+      position: relative;
+    }
+
+    .hero h1 {
+      font-size: clamp(2.2rem,6vw,3.6rem);
+      margin-bottom: 18px;
+    }
+
+    .hero p.topline {
+      letter-spacing: .28em;
+      text-transform: uppercase;
+      font-size: .8rem;
+      margin-bottom: 10px;
+    }
+
+    .hero p.meta {
+      letter-spacing: .25em;
+      text-transform: uppercase;
+      font-size: .8rem;
+    }
+
+    /* countdown */
+
+    .countdown {
+      display:flex;
+      justify-content:center;
+      gap:26px;
+      margin-top:30px;
+      flex-wrap:wrap;
+    }
+
+    .time-box {
+      border: 1px solid rgba(255,255,255,.6);
+      padding: 10px 14px;
+      min-width: 62px;
+      border-radius:10px;
+      background: rgba(0,0,0,.16);
+    }
+
+    .time-box span {
+      display:block;
+      font-size:1.4rem;
+      font-family:"Playfair Display", serif;
+      line-height:1.2;
+    }
+
+    .time-box small {
+      font-size:.6rem;
+      letter-spacing:.25em;
+      text-transform:uppercase;
+    }
+
+    /* scroll hint */
+
+    .scroll-hint {
+      position: absolute;
+      left: 50%;
+      bottom: 20px;
+      transform: translateX(-50%);
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      font-size: .65rem;
+      letter-spacing: .25em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.85);
+      text-decoration: none;
+    }
+
+    .scroll-dot {
+      width: 18px;
+      height: 32px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.8);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .scroll-dot::after {
+      content:"";
+      position:absolute;
+      left:50%;
+      width:4px;
+      height:8px;
+      border-radius:999px;
+      background:rgba(255,255,255,.9);
+      transform:translate(-50%,-150%);
+      animation: scrollDot 1.4s ease-in-out infinite;
+    }
+
+    @keyframes scrollDot {
+      0% { transform: translate(-50%,-150%); opacity:0; }
+      30% { opacity:1; }
+      100% { transform: translate(-50%,140%); opacity:0; }
+    }
+
+    /* TITLURI SECȚIUNI */
+
+    .title {
+      text-align:center;
+      margin-bottom:60px;
+    }
+
+    .title span {
+      text-transform: uppercase;
+      letter-spacing: .3em;
+      font-size: .7rem;
+      color: var(--muted);
+      display: block;
+      margin-bottom: 10px;
+    }
+
+    .title h2 {
+      font-size:2rem;
+    }
+
+    /* CARD generic */
+
+    .card {
+      background: white;
+      border-radius: 25px;
+      padding: 40px;
+      border:1px solid rgba(0,0,0,.05);
+      box-shadow: 0 20px 40px rgba(0,0,0,.05);
+      text-align: center;
+      transition: transform .25s ease, box-shadow .25s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 26px 50px rgba(0,0,0,.08);
+    }
+
+    /* SECȚIUNEA INVITAȚIE – 2 coloane (card + hartă) */
+
+    .details-layout {
+      display: grid;
+      gap: 40px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    @media (min-width: 900px) {
+      .details-layout {
+        grid-template-columns: 1.1fr 1fr;
+        align-items: center;
+      }
+    }
+
+    .invitation-card {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 55px 45px;
+      line-height: 1.9;
+    }
+
+    .invitation-card p {
+      font-size: .95rem;
+      color: #555;
+      margin-bottom: 26px;
+    }
+
+    .invitation-card p strong {
+      color: #222;
+    }
+
+    .invitation-card .location {
+      margin-top: 6px;
+      font-size: .95rem;
+      letter-spacing: .04em;
+      text-align: center;
+    }
+
+    .invitation-card .theme {
+      margin-top: -6px;
+      font-style: italic;
+      color: #777;
+      text-align: center;
+    }
+
+    .maps-link {
+      display: inline-block;
+      margin-top: 20px;
+      font-size: .75rem;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: #a78a64;
+      text-decoration: none;
+      border-bottom: 1px solid #a78a64;
+      padding-bottom: 4px;
+      transition: all .25s ease;
+    }
+
+    .maps-link:hover {
+      color: #8f7350;
+      border-color: #8f7350;
+    }
+
+    .map-card {
+      border-radius: 30px;
+      overflow: hidden;
+      box-shadow: 0 18px 40px rgba(0,0,0,.08);
+      background: #ddd;
+      transition: transform .3s ease, box-shadow .3s ease;
+    }
+
+    .map-card a {
+      position: relative;
+      display: block;
+    }
+
+    .map-card img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      filter: saturate(0.9) contrast(1.02);
+    }
+
+    .map-card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 26px 60px rgba(0,0,0,.12);
+    }
+
+    .map-label {
+      position: absolute;
+      bottom: 18px;
+      left: 20px;
+      background: rgba(248,245,233,0.94);
+      padding: 8px 16px;
+      border-radius: 999px;
+      font-size: .7rem;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: #7c6648;
+    }
+
+    @media (max-width: 899px) {
+      .invitation-card {
+        padding: 42px 26px;
+      }
+      .map-card {
+        max-width: 480px;
+        margin: 0 auto;
+      }
+    }
+
+    /* DRESS CODE & CULORI */
+
+    .dress-grid {
+      display:grid;
+      gap:40px;
+      max-width:900px;
+      margin:0 auto;
+    }
+
+    @media(min-width:820px){
+      .dress-grid { grid-template-columns: 1.2fr 1fr; }
+    }
+
+    .dress-card,
+    .colors-card {
+      background:#fff;
+      border-radius:25px;
+      padding:40px;
+      border:1px solid rgba(0,0,0,.05);
+      box-shadow:0 18px 40px rgba(0,0,0,.05);
+      transition: transform .25s ease, box-shadow .25s ease;
+    }
+
+    .dress-card:hover,
+    .colors-card:hover {
+      transform: translateY(-4px);
+      box-shadow:0 24px 60px rgba(0,0,0,.08);
+    }
+
+    .dress-card h3 {
+      font-size:1.1rem;
+      margin-bottom:14px;
+    }
+
+    .dress-card p {
+      font-size:.9rem;
+      color:var(--muted);
+      line-height:1.7;
+    }
+
+    .colors-title {
+      font-family:"Playfair Display",serif;
+      font-size:.9rem;
+      letter-spacing:.2em;
+      text-transform:uppercase;
+      margin-bottom:18px;
+    }
+
+    .swatches {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  column-gap: 60px;   /* distanța între cele două coloane */
+  row-gap: 18px;      /* distanța verticală între rânduri */
+}
+
+    .swatch {
+      display:flex;
+      align-items:center;
+      gap:8px;
+      font-size:.78rem;
+      color:var(--muted);
+    }
+
+    .swatch-dot {
+      width:24px;
+      height:24px;
+      border-radius:999px;
+      border:1px solid rgba(0,0,0,.12);
+      box-shadow:0 3px 6px rgba(0,0,0,.12);
+    }
+
+    .swatch-label {
+      display:flex;
+      flex-direction:column;
+      gap:2px;
+    }
+
+    .swatch-name {
+      text-transform:uppercase;
+      letter-spacing:.16em;
+      font-size:.65rem;
+      color:var(--ink);
+    }
+
+    .swatch-hex {
+      font-size:.7rem;
+    }
+
+    /* RSVP cu VIDEO DE FUNDAL */
+
+    .rsvp-section {
+      position:relative;
+      overflow:hidden;
+      padding:120px 6vw;
+    }
+
+    .rsvp-video-bg {
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      z-index:-2;
+    }
+
+    .rsvp-overlay {
+      position:absolute;
+      inset:0;
+      background: linear-gradient(to bottom, rgba(0,0,0,0.45), rgba(0,0,0,0.7));
+      z-index:-1;
+    }
+
+    .rsvp-inner {
+      max-width:720px;
+      margin:0 auto;
+      color:white;
+    }
+
+    .rsvp-title span {
+      text-transform:uppercase;
+      letter-spacing:.3em;
+      font-size:.7rem;
+      color:rgba(255,255,255,.76);
+      display:block;
+      margin-bottom:10px;
+      text-align:center;
+    }
+
+    .rsvp-title h2 {
+      text-align:center;
+      font-size:2rem;
+      margin-bottom:40px;
+    }
+
+    .rsvp-box {
+      background: rgba(248,245,233,0.96);
+      color:var(--ink);
+      max-width:600px;
+      margin: 0 auto;
+      padding: 50px;
+      border-radius: 30px;
+      border:1px solid rgba(255,255,255,.5);
+      text-align:center;
+      box-shadow: 0 20px 40px rgba(0,0,0,.35);
+      transition: transform .25s ease, box-shadow .25s ease;
+    }
+
+    .rsvp-box:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 24px 60px rgba(0,0,0,.5);
+    }
+
+    input, textarea, select {
+      width:100%;
+      padding:14px;
+      border-radius:15px;
+      border:1px solid rgba(0,0,0,.2);
+      margin-top:10px;
+      margin-bottom:20px;
+      font-size:.9rem;
+      font-family: inherit;
+    }
+
+    button {
+      padding:16px 40px;
+      background: linear-gradient(135deg,#c2ab85,#a78a64);
+      color:white;
+      border:none;
+      border-radius:50px;
+      letter-spacing:.2em;
+      cursor:pointer;
+      text-transform:uppercase;
+      font-size:.75rem;
+      box-shadow: 0 14px 30px rgba(0,0,0,.25);
+      transition: transform .2s ease, box-shadow .2s ease, filter .2s ease;
+    }
+
+    button:hover {
+      filter: brightness(1.05);
+      transform: translateY(-1px);
+      box-shadow: 0 18px 36px rgba(0,0,0,.3);
+    }
+
+    /* FOOTER */
+
+    footer {
+      padding: 30px 6vw 40px;
+      background: var(--paper-alt);
+      text-align:center;
+      font-size:.75rem;
+      letter-spacing:.22em;
+      text-transform:uppercase;
+      color:var(--muted);
+    }
+
+    /* ANIMAȚII REVEAL */
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(26px);
+      transition: opacity 650ms ease-out, transform 650ms ease-out;
+    }
+
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Responsive mic */
+
+    @media(max-width:600px){
+      section{padding:80px 5vw;}
+      .hero-content{padding-inline:10px;}
+      .countdown{gap:14px;}
+      .time-box{
+        padding:8px 10px;
+        min-width:56px;
+      }
+      .time-box span{font-size:1.2rem;}
+      .hero h1{font-size:2.2rem;}
+      .hero p.topline,
+      .hero p.meta{font-size:.7rem;letter-spacing:.22em;}
+      .rsvp-box{padding:35px 24px;}
+    }
+
+    .section-divider {
+      position: relative;
+      width: 100%;
+      height: 0;
+    }
+
+    .section-divider img {
+      position: absolute;
+      left: 50%;
+      top: -35px;
+      transform: translateX(-50%);
+      width: 70px;
+      background: #fff;
+      padding: 10px 14px;
+      border-radius: 50%;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    }
+
+    @media(max-width:600px){
+      .section-divider img {
+        width: 75px;
+        top: -40px;
+      }
+      .swatches {
+    grid-template-columns: 1fr;
+    column-gap: 0;
+  }
+    }
+
+    /* Forțează numele pe o linie pe telefon */
+@media (max-width: 480px) {
+  .hero h1 {
+    font-size: 1.85rem;   /* puțin mai mic DOAR pe telefon */
+    white-space: nowrap;  /* nu rupe rândul */
+  }
+}
+
+    @media (max-width: 380px) {
+  .hero h1 {
+    font-size: 1.7rem;
+  }
+}
+  </style>
+</head>
+<body>
+
+<!-- HERO cu VIDEO -->
+<section class="hero">
+  <video autoplay muted loop playsinline class="bg-video">
+    <source src="4.mp4" type="video/mp4">
+  </video>
+
+  <div class="hero-content reveal">
+    <p class="topline">Save the date</p>
+    <h1>Minerva &amp; Virgil</h1>
+    <p class="meta">23 Mai 2026 · 15:30</p>
+
+    <div class="countdown">
+      <div class="time-box"><span id="days">00</span><small>Zile</small></div>
+      <div class="time-box"><span id="hours">00</span><small>Ore</small></div>
+      <div class="time-box"><span id="minutes">00</span><small>Min</small></div>
+      <div class="time-box"><span id="seconds">00</span><small>Sec</small></div>
+    </div>
+  </div>
+
+  <a href="#details" class="scroll-hint">
+    <div class="scroll-dot"></div>
+    SCROLL
+  </a>
+</section>
+
+<!-- INVITAȚIE -->
+<section id="details" class="section-main">
+  <div class="title reveal">
+    <span>Invitație</span>
+    <h2>Cununia civilă pe plajă</h2>
+  </div>
+
+  <div class="invitation-card card reveal">
+    <p>
+      Vă invităm să fiți alături de noi la cununia noastră civilă,
+      care va avea loc pe plajă, la ora <strong>15:30</strong>,
+      într-un cadru cald, natural și plin de emoție.
+    </p>
+
+    <p>
+      Ne-ar face o mare bucurie să împărtășim această zi specială împreună.
+    </p>
+
+    <p class="location">
+      Evenimentul va fi la<br>
+      <strong>Glamour by the Sea – Constanța</strong>
+    </p>
+
+    <p class="theme">
+      Tematică: <strong>White &amp; Sand</strong>
+    </p>
+
+    <a
+      href="https://www.google.com/maps/search/?api=1&query=Glamour+by+the+Sea+Constanta"
+      target="_blank"
+      class="maps-link"
+    >
+      Vezi locația pe Google Maps
+    </a>
+  </div>
+</section>
+
+<div class="section-divider">
+  <img src="wedding-icon.svg" alt="Divider icon">
+</div>
+
+<!-- DRESS CODE & CULORI -->
+<section id="dresscode" class="section-alt">
+  <div class="title reveal">
+    <span>Dress code &amp; tematică</span>
+    <h2>White &amp; Sand</h2>
+  </div>
+
+  <div class="dress-grid">
+    <div class="dress-card reveal">
+      <h3>Dress code: nuanțe deschise</h3>
+      <p>
+        În nuanțe deschise, inspirate de alb, bej și nisip. Rochii fluide, cămăși din in sau bumbac, pantaloni lejeri, costume deschise la culoare.
+      </p>
+      <p style="margin-top:14px;">
+        Vă rugăm să evitați culorile foarte închise, ne dorim o atmosferă luminoasă, aerisită, în ton cu marea și nisipul.
+      </p>
+    </div>
+
+    <div class="colors-card reveal">
+      <div class="colors-title">Paleta zilei</div>
+      <div class="swatches">
+        <div class="swatch">
+          <div class="swatch-dot" style="background:#EAEAEA;"></div>
+          <div class="swatch-label">
+            <span class="swatch-name">Light Gray</span>
+            <span class="swatch-hex">#EAEAEA</span>
+          </div>
+        </div>
+
+        <div class="swatch">
+          <div class="swatch-dot" style="background:#F8F5E9;"></div>
+          <div class="swatch-label">
+            <span class="swatch-name">Ivory Cream</span>
+            <span class="swatch-hex">#F8F5E9</span>
+          </div>
+        </div>
+
+        <div class="swatch">
+          <div class="swatch-dot" style="background:#E8DCC0;"></div>
+          <div class="swatch-label">
+            <span class="swatch-name">Soft Sand</span>
+            <span class="swatch-hex">#E8DCC0</span>
+          </div>
+        </div>
+
+        <div class="swatch">
+          <div class="swatch-dot" style="background:#E4CDA7;"></div>
+          <div class="swatch-label">
+            <span class="swatch-name">Champagne</span>
+            <span class="swatch-hex">#E4CDA7</span>
+          </div>
+        </div>
+
+        <div class="swatch">
+          <div class="swatch-dot" style="background:#D6B370;"></div>
+          <div class="swatch-label">
+            <span class="swatch-name">Warm Honey</span>
+            <span class="swatch-hex">#D6B370</span>
+          </div>
+        </div>
+        <div class="swatch">
+  <div class="swatch-dot" style="background:#B8B5AF;"></div>
+  <div class="swatch-label">
+    <span class="swatch-name">Warm Greige</span>
+    <span class="swatch-hex">#B8B5AF</span>
+  </div>
+</div>
+
+<div class="swatch">
+  <div class="swatch-dot" style="background:#9C8F84;"></div>
+  <div class="swatch-label">
+    <span class="swatch-name">Warm Taupe</span>
+    <span class="swatch-hex">#9C8F84</span>
+  </div>
+</div>
+
+<div class="swatch">
+  <div class="swatch-dot" style="background:#E6CFC2;"></div>
+  <div class="swatch-label">
+    <span class="swatch-name">Blush Nude</span>
+    <span class="swatch-hex">#E6CFC2</span>
+  </div>
+</div>
+
+<div class="swatch">
+  <div class="swatch-dot" style="background:#C89A6A;"></div>
+  <div class="swatch-label">
+    <span class="swatch-name">Caramel Soft</span>
+    <span class="swatch-hex">#C89A6A</span>
+  </div>
+</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- RSVP cu VIDEO PE FUNDAL -->
+<section id="rsvp" class="rsvp-section">
+  <video autoplay muted loop playsinline class="rsvp-video-bg">
+    <source src="3.mp4" type="video/mp4">
+  </video>
+  <div class="rsvp-overlay"></div>
+
+  <div class="rsvp-inner">
+    <div class="rsvp-title reveal">
+      <span>Your response</span>
+      <h2>Confirmă prezența</h2>
+    </div>
+
+    <div class="rsvp-box reveal">
+      <h3 style="margin-bottom:20px;">RSVP</h3>
+
+      <form id="rsvpForm">
+        <input id="name" type="text" placeholder="Numele tău" required>
+        <select id="status" required>
+          <option value="">Participi?</option>
+          <option value="vin">Voi fi prezent(ă)</option>
+          <option value="nu vin">Nu pot ajunge</option>
+        </select>
+        <input id="adults" type="number" placeholder="Număr adulți">
+        <input id="kids" type="number" placeholder="Număr copii">
+        <textarea id="message" rows="3" placeholder="Mesaj opțional"></textarea>
+
+        <button type="submit">Confirm pe WhatsApp</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<footer>
+  Cu drag, Minerva &amp; Virgil · 23 Mai 2026
+</footer>
+
+<script>
+  // COUNTDOWN – setezi data și ora aici
+  const EVENT_DATE = new Date("2026-05-23T15:30:00");
+
+  function updateCountdown() {
+    const now = new Date().getTime();
+    const diff = EVENT_DATE.getTime() - now;
+
+    let days = 0, hours = 0, minutes = 0, seconds = 0;
+
+    if (diff > 0) {
+      days    = Math.floor(diff / (1000*60*60*24));
+      hours   = Math.floor((diff / (1000*60*60)) % 24);
+      minutes = Math.floor((diff / (1000*60)) % 60);
+      seconds = Math.floor((diff / 1000) % 60);
+    }
+
+    document.getElementById("days").textContent    = String(days).padStart(2,"0");
+    document.getElementById("hours").textContent   = String(hours).padStart(2,"0");
+    document.getElementById("minutes").textContent = String(minutes).padStart(2,"0");
+    document.getElementById("seconds").textContent = String(seconds).padStart(2,"0");
+  }
+
+  updateCountdown();
+  setInterval(updateCountdown, 1000);
+
+  // RSVP – WhatsApp
+  const phone = "40799819522"; // schimbă cu numărul tău (fără +)
+
+  document.getElementById("rsvpForm").addEventListener("submit", e => {
+    e.preventDefault();
+
+    const name = document.getElementById("name").value.trim();
+    const status = document.getElementById("status").value;
+    const adults = document.getElementById("adults").value.trim();
+    const kids = document.getElementById("kids").value.trim();
+    const message = document.getElementById("message").value.trim();
+
+    if (!name || !status) {
+      alert("Te rugăm să completezi numele și dacă participi.");
+      return;
+    }
+
+    const text = `Salut, sunt ${name}. ${status}. Adulti: ${adults || 0}. Copii: ${kids || 0}. Mesaj: ${message || "-"}`;
+
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, "_blank");
+  });
+
+  // ANIMAȚII LA SCROLL
+  const revealEls = document.querySelectorAll('.reveal');
+
+  const observer = new IntersectionObserver(
+    (entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    },
+    { threshold: 0.15 }
+  );
+
+  revealEls.forEach(el => observer.observe(el));
+</script>
+
+</body>
+</html>
+
+
+
+
+

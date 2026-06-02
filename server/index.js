@@ -75,7 +75,7 @@ function migrate() {
       hero_image_url TEXT,
       profile_image_url TEXT,
       theme_color TEXT NOT NULL DEFAULT 'sage',
-      invitation_template TEXT NOT NULL DEFAULT 'regency',
+      invitation_template TEXT NOT NULL DEFAULT 'custom',
       brand_name TEXT NOT NULL DEFAULT 'Gestionare Nunta',
       brand_logo_url TEXT,
       invite_intro TEXT,
@@ -192,15 +192,26 @@ function migrate() {
       y INTEGER NOT NULL DEFAULT 40,
       shape TEXT NOT NULL DEFAULT 'round'
     );
+
+    CREATE TABLE IF NOT EXISTS activity_events (
+      id TEXT PRIMARY KEY,
+      wedding_id TEXT NOT NULL REFERENCES weddings(id) ON DELETE CASCADE,
+      type TEXT NOT NULL,
+      title TEXT NOT NULL,
+      detail TEXT,
+      seen_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 
   addColumn("users", "is_super_admin", "INTEGER NOT NULL DEFAULT 0");
   addColumn("users", "status", "TEXT NOT NULL DEFAULT 'active'");
   addColumn("media_uploads", "seen_at", "TEXT");
+  addColumn("activity_events", "seen_at", "TEXT");
   addColumn("weddings", "wedding_time", "TEXT");
   addColumn("weddings", "profile_image_url", "TEXT");
   addColumn("weddings", "theme_color", "TEXT NOT NULL DEFAULT 'sage'");
-  addColumn("weddings", "invitation_template", "TEXT NOT NULL DEFAULT 'regency'");
+  addColumn("weddings", "invitation_template", "TEXT NOT NULL DEFAULT 'custom'");
   addColumn("weddings", "brand_name", "TEXT NOT NULL DEFAULT 'Gestionare Nunta'");
   addColumn("weddings", "brand_logo_url", "TEXT");
   addColumn("weddings", "menu_options_json", "TEXT NOT NULL DEFAULT '[\"Carne\",\"Peste\",\"Vegetarian\",\"Copil\"]'");
@@ -232,6 +243,11 @@ function migrate() {
   }
 
   seed();
+}
+
+function addActivity(weddingId, type, title, detail = "") {
+  db.prepare("INSERT INTO activity_events (id, wedding_id, type, title, detail) VALUES (?, ?, ?, ?, ?)")
+    .run(id("act"), weddingId, type, title, detail);
 }
 
 function seed() {
@@ -497,10 +513,12 @@ function dashboard(wedding, origin, userId = wedding.owner_id) {
     mediaUploads: db.prepare("SELECT id, guest_name, file_name, mime_type, size, seen_at, created_at FROM media_uploads WHERE wedding_id = ? ORDER BY created_at DESC").all(wedding.id)
       .map((upload) => ({ ...upload, url: `/api/media-files/${upload.id}`, is_new: !upload.seen_at })),
     notifications: {
+      newAcceptances: db.prepare("SELECT COUNT(*) AS total FROM activity_events WHERE wedding_id = ? AND type = 'rsvp_confirmed' AND seen_at IS NULL").get(wedding.id).total,
       newUploads: db.prepare("SELECT COUNT(*) AS total FROM media_uploads WHERE wedding_id = ? AND seen_at IS NULL").get(wedding.id).total,
       openTasks: db.prepare("SELECT COUNT(*) AS total FROM tasks WHERE wedding_id = ? AND done = 0 AND due IS NOT NULL AND due != '' AND date(due) <= date('now', '+7 day')").get(wedding.id).total,
       duePayments: db.prepare("SELECT COUNT(*) AS total FROM budget_items WHERE wedding_id = ? AND status != 'Achitat' AND due IS NOT NULL AND due != '' AND date(due) <= date('now', '+14 day')").get(wedding.id).total
-    }
+    },
+    recentAcceptances: db.prepare("SELECT id, title, detail, seen_at, created_at FROM activity_events WHERE wedding_id = ? AND type = 'rsvp_confirmed' ORDER BY created_at DESC LIMIT 5").all(wedding.id)
   };
 }
 
@@ -646,6 +664,10 @@ async function handleApi(req, res, url) {
       UPDATE guests SET status = ?, seats = ?, meal_choice = ?, allergies = ?, guest_message = ?, response_locked = 1, updated_at = CURRENT_TIMESTAMP
       WHERE invitation_token = ?
     `).run(status, Math.max(1, Math.min(10, Number(body.seats) || 1)), String(body.meal_choice || ""), String(body.allergies || ""), String(body.guest_message || ""), inviteToken);
+    const seats = Math.max(1, Math.min(10, Number(body.seats) || 1));
+    const activityType = status === "Confirmat" ? "rsvp_confirmed" : status === "Refuzat" ? "rsvp_declined" : "rsvp";
+    const activityTitle = status === "Confirmat" ? `${guest.name} a acceptat invitatia` : `${guest.name} a trimis raspuns`;
+    addActivity(guest.wedding_id, activityType, activityTitle, `${status} - ${seats} locuri`);
     send(res, 200, { ok: true });
     return;
   }
@@ -666,6 +688,7 @@ async function handleApi(req, res, url) {
     const files = Array.isArray(body.files) ? body.files.slice(0, 8) : [];
     const targetDir = join(uploadsDir, wedding.id);
     if (!existsSync(targetDir)) mkdirSync(targetDir, { recursive: true });
+    let savedFiles = 0;
     for (const file of files) {
       const match = String(file.dataUrl || "").match(/^data:([^;]+);base64,(.+)$/);
       if (!match) continue;
@@ -677,7 +700,9 @@ async function handleApi(req, res, url) {
       await writeFile(filePath, buffer);
       db.prepare("INSERT INTO media_uploads (id, wedding_id, guest_name, file_name, file_path, mime_type, size) VALUES (?, ?, ?, ?, ?, ?, ?)")
         .run(id("upl"), wedding.id, String(body.guest_name || ""), cleanName, filePath, mimeType, buffer.length);
+      savedFiles += 1;
     }
+    if (savedFiles) addActivity(wedding.id, "upload", `${body.guest_name || "Un invitat"} a incarcat fisiere`, `${savedFiles} fisiere noi in galerie`);
     send(res, 201, { ok: true });
     return;
   }
@@ -809,7 +834,7 @@ async function handleApi(req, res, url) {
     const body = await readBody(req);
     db.prepare(`
       UPDATE weddings SET couple = ?, wedding_date = ?, wedding_time = ?, venue = ?, venue_address = ?, map_url = ?, dress_code = ?,
-      hero_image_url = ?, profile_image_url = ?, theme_color = ?, invite_intro = ?, menu_options_json = ?, program_json = ?, whatsapp_message = ? WHERE id = ?
+      hero_image_url = ?, profile_image_url = ?, theme_color = ?, invitation_template = ?, invite_intro = ?, menu_options_json = ?, program_json = ?, whatsapp_message = ? WHERE id = ?
     `).run(
       String(body.couple || "Nunta"),
       String(body.wedding_date || ""),
@@ -821,6 +846,7 @@ async function handleApi(req, res, url) {
       String(body.hero_image_url || ""),
       String(body.profile_image_url || ""),
       ["sage", "rose", "navy", "dark"].includes(body.theme_color) ? body.theme_color : "sage",
+      "custom",
       String(body.invite_intro || ""),
       JSON.stringify((Array.isArray(body.menu_options) ? body.menu_options : []).filter(Boolean)),
       JSON.stringify(Array.isArray(body.program) ? body.program : []),
@@ -861,12 +887,16 @@ async function handleApi(req, res, url) {
     }
     db.prepare("INSERT INTO suppliers (id, wedding_id, name, category, phone, email, contract_name, contract_path, advance, total, due, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
       .run(id("sup"), wedding.id, String(body.name || "Furnizor"), String(body.category || ""), String(body.phone || ""), String(body.email || ""), contractName, contractPath, Number(body.advance) || 0, Number(body.total) || 0, String(body.due || ""), String(body.notes || ""));
+    addActivity(wedding.id, "supplier", `Furnizor adaugat: ${String(body.name || "Furnizor")}`, `Total contract: ${Number(body.total) || 0} RON`);
     send(res, 201, dashboard(wedding, origin, session.user_id));
     return;
   }
 
   if (req.method === "DELETE" && url.pathname.startsWith("/api/suppliers/")) {
-    db.prepare("DELETE FROM suppliers WHERE id = ? AND wedding_id = ?").run(url.pathname.split("/").pop(), wedding.id);
+    const supplierId = url.pathname.split("/").pop();
+    const supplier = db.prepare("SELECT name FROM suppliers WHERE id = ? AND wedding_id = ?").get(supplierId, wedding.id);
+    db.prepare("DELETE FROM suppliers WHERE id = ? AND wedding_id = ?").run(supplierId, wedding.id);
+    if (supplier) addActivity(wedding.id, "supplier", `Furnizor sters: ${supplier.name}`, "");
     send(res, 200, dashboard(wedding, origin, session.user_id));
     return;
   }
@@ -973,6 +1003,12 @@ async function handleApi(req, res, url) {
     return;
   }
 
+  if (req.method === "POST" && url.pathname === "/api/rsvp-acceptances/seen") {
+    db.prepare("UPDATE activity_events SET seen_at = CURRENT_TIMESTAMP WHERE wedding_id = ? AND type = 'rsvp_confirmed' AND seen_at IS NULL").run(wedding.id);
+    send(res, 200, dashboard(wedding, origin, session.user_id));
+    return;
+  }
+
   if (req.method === "GET" && url.pathname === "/api/media-uploads/zip") {
     const uploads = db.prepare("SELECT * FROM media_uploads WHERE wedding_id = ? ORDER BY created_at DESC").all(wedding.id);
     const zip = new AdmZip();
@@ -995,8 +1031,12 @@ async function handleApi(req, res, url) {
   if (req.method === "GET" && url.pathname.startsWith("/api/export/")) {
     const type = url.pathname.split("/").pop();
     if (type === "guests") {
-      return sendText(res, 200, toCsv(listGuests(wedding, origin), [
-        { key: "name", label: "Nume" }, { key: "phone", label: "Telefon" }, { key: "group_name", label: "Grup" },
+      const guests = listGuests(wedding, origin).map((guest) => {
+        const [firstName, ...lastName] = String(guest.name || "").split(" ");
+        return { ...guest, first_name: firstName || "", last_name: lastName.join(" ") };
+      });
+      return sendText(res, 200, toCsv(guests, [
+        { key: "first_name", label: "Nume" }, { key: "last_name", label: "Prenume" }, { key: "phone", label: "Telefon" },
         { key: "status", label: "Status" }, { key: "seats", label: "Locuri" }, { key: "meal_choice", label: "Meniu" },
         { key: "allergies", label: "Alergii" }, { key: "table_label", label: "Masa" }, { key: "inviteUrl", label: "Link invitatie" }
       ]), "invitati.csv");
@@ -1008,7 +1048,7 @@ async function handleApi(req, res, url) {
     }
     if (type === "tables") {
       return sendText(res, 200, toCsv(listGuests(wedding, origin).filter((guest) => guest.table_id), [
-        { key: "table_label", label: "Masa" }, { key: "name", label: "Invitat" }, { key: "seats", label: "Locuri" }, { key: "group_name", label: "Grup" }
+        { key: "table_label", label: "Masa" }, { key: "name", label: "Invitat" }, { key: "seats", label: "Locuri" }
       ]), "mese.csv");
     }
     if (type === "tables-pdf") {

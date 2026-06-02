@@ -33,6 +33,8 @@ import {
 import "./styles.css";
 
 const emptyGuest = {
+  first_name: "",
+  last_name: "",
   name: "",
   phone: "",
   side: "Comun",
@@ -63,6 +65,8 @@ function dateLabel(value) {
   if (!value) return "Data necompletata";
   return new Date(`${value}T12:00:00`).toLocaleDateString("ro-RO", { day: "numeric", month: "long", year: "numeric" });
 }
+
+const inviteImageResolution = "1920 x 1200 px";
 
 function weddingDateTime(wedding) {
   if (!wedding.wedding_date) return null;
@@ -233,6 +237,9 @@ function Dashboard({ session, onLogout }) {
   const [error, setError] = useState("");
 
   useEffect(() => { refresh(); }, []);
+  useEffect(() => {
+    if (active === "room") setActive("tables");
+  }, [active]);
 
   async function refresh() {
     setError("");
@@ -247,8 +254,10 @@ function Dashboard({ session, onLogout }) {
     setError("");
     try {
       setData(await api(path, options));
+      return true;
     } catch (err) {
       setError(err.message);
+      return false;
     }
   }
 
@@ -263,18 +272,15 @@ function Dashboard({ session, onLogout }) {
   if (!data) return <ScreenLoader />;
 
   const confirmedSeats = data.guests.filter((guest) => guest.status === "Confirmat").reduce((sum, guest) => sum + Number(guest.seats || 0), 0);
-  const paid = data.budget.reduce((sum, item) => sum + Number(item.paid || 0), 0);
-  const planned = data.budget.reduce((sum, item) => sum + Number(item.planned || 0), 0);
+  const paid = data.suppliers.reduce((sum, item) => sum + Number(item.advance || 0), 0);
+  const planned = data.suppliers.reduce((sum, item) => sum + Number(item.total || 0), 0);
   const done = data.tasks.filter((task) => task.done).length;
   const tabs = [
     ...(session.user.isSuperAdmin ? [["admin", "Super Admin", ShieldCheck]] : []),
     ["progress", "Progres", BarChart3],
     ["guests", "Invitati", Users],
     ["tables", "Mese", Table2],
-    ["room", "Plan sala", Table2],
-    ["budget", "Buget", WalletCards],
-    ["suppliers", "Furnizori", FileText],
-    ["tasks", "Checklist", ClipboardList],
+    ["suppliers", "Buget & Furnizori", WalletCards],
     ["calendar", "Calendar", CalendarDays],
     ["exports", "Export", Download],
     ["media", "QR Media", QrCode],
@@ -299,13 +305,19 @@ function Dashboard({ session, onLogout }) {
           {tabs.map(([key, label, Icon]) => (
             <button className={active === key ? "active" : ""} key={key} onClick={() => {
               setActive(key);
+              if (key === "guests" && data.notifications?.newAcceptances) mutate("/api/rsvp-acceptances/seen", { method: "POST" });
               if (key === "photos" && data.notifications?.newUploads) mutate("/api/media-uploads/seen", { method: "POST" });
             }} type="button">
               <Icon size={18} />{label}
+              {key === "guests" && data.notifications?.newAcceptances ? <span className="nav-badge">{data.notifications.newAcceptances}</span> : null}
               {key === "photos" && data.notifications?.newUploads ? <span className="nav-badge">{data.notifications.newUploads}</span> : null}
             </button>
           ))}
         </nav>
+        <div className="sidebar-footer">
+          <span>{session.user.name}</span>
+          <button onClick={logout} type="button"><LogOut size={18} />Deconectare</button>
+        </div>
       </aside>
 
       <main className="workspace">
@@ -314,30 +326,25 @@ function Dashboard({ session, onLogout }) {
             <p className="eyebrow">Panou organizatori</p>
             <h1>{data.wedding.couple}</h1>
           </div>
-          <div className="user-tools">
-            <span>{session.user.name}</span>
-            <button className="icon-button" onClick={logout} title="Logout" type="button"><LogOut size={18} /></button>
-          </div>
         </header>
 
         {error ? <p className="form-error">{error}</p> : null}
 
-        <section className="metrics-grid">
-          <Metric icon={<Users />} label="Persoane confirmate" value={confirmedSeats} detail={`${data.guests.length} invitati in lista`} />
-          <Metric icon={<Table2 />} label="Mese" value={data.tables.length} detail="cu capacitate si repartizare" />
-          <Metric icon={<WalletCards />} label="Buget platit" value={money(paid)} detail={`${money(planned)} planificat`} />
-          <Metric icon={<ClipboardList />} label="Task-uri bifate" value={`${done}/${data.tasks.length}`} detail="organizare curenta" />
-        </section>
+        {active === "progress" ? (
+          <section className="metrics-grid">
+            <Metric icon={<Users />} label="Persoane confirmate" value={confirmedSeats} detail={`${data.guests.length} invitati in lista`} />
+            <Metric icon={<Table2 />} label="Mese" value={data.tables.length} detail="cu capacitate si repartizare" />
+            <Metric icon={<WalletCards />} label="Buget platit" value={money(paid)} detail={`${money(planned)} planificat`} />
+            <Metric icon={<ClipboardList />} label="Task-uri bifate" value={`${done}/${data.tasks.length}`} detail="organizare curenta" />
+          </section>
+        ) : null}
 
         {active === "admin" ? <SuperAdmin mutate={mutate} /> : null}
         {active === "progress" ? <ProgressReports data={data} /> : null}
         {active === "guests" ? <Guests data={data} mutate={mutate} /> : null}
-        {active === "tables" ? <Tables data={data} mutate={mutate} /> : null}
-        {active === "room" ? <RoomPlan data={data} mutate={mutate} /> : null}
-        {active === "budget" ? <Budget data={data} mutate={mutate} /> : null}
+        {active === "tables" ? <SeatingSection data={data} mutate={mutate} /> : null}
         {active === "suppliers" ? <Suppliers data={data} mutate={mutate} /> : null}
-        {active === "tasks" ? <Tasks data={data} mutate={mutate} /> : null}
-        {active === "calendar" ? <CalendarView data={data} /> : null}
+        {active === "calendar" ? <CalendarView data={data} mutate={mutate} /> : null}
         {active === "exports" ? <Exports /> : null}
         {active === "media" ? <MediaQr data={data} /> : null}
         {active === "photos" ? <Photos data={data} /> : null}
@@ -459,8 +466,8 @@ function ProgressReports({ data }) {
   const invited = data.guests.length || 1;
   const seated = data.guests.filter((guest) => guest.status === "Confirmat" && guest.table_id).length;
   const tasksDone = data.tasks.filter((task) => task.done).length;
-  const budgetPaid = data.budget.reduce((sum, item) => sum + Number(item.paid || 0), 0);
-  const budgetPlan = data.budget.reduce((sum, item) => sum + Number(item.planned || 0), 0) || 1;
+  const budgetPaid = data.suppliers.reduce((sum, item) => sum + Number(item.advance || 0), 0);
+  const budgetPlan = data.suppliers.reduce((sum, item) => sum + Number(item.total || 0), 0) || 1;
   const menuCounts = data.guests.reduce((counts, guest) => {
     if (guest.status === "Confirmat") counts[guest.meal_choice || "Neales"] = (counts[guest.meal_choice || "Neales"] || 0) + Number(guest.seats || 1);
     return counts;
@@ -473,7 +480,7 @@ function ProgressReports({ data }) {
       <div className="report-grid">
         <ReportBar label="Confirmari" value={confirmed} total={invited} />
         <ReportBar label="Asezare la mese" value={seated} total={Math.max(confirmed, 1)} />
-        <ReportBar label="Checklist" value={tasksDone} total={Math.max(data.tasks.length, 1)} />
+        <ReportBar label="Sarcini" value={tasksDone} total={Math.max(data.tasks.length, 1)} />
         <ReportBar label="Buget platit" value={budgetPaid} total={budgetPlan} moneyMode />
       </div>
       <div className="report-grid">
@@ -493,14 +500,20 @@ function Guests({ data, mutate }) {
   const [form, setForm] = useState(emptyGuest);
   const [copied, setCopied] = useState("");
   const [filters, setFilters] = useState({ search: "", status: "all", table: "all" });
+  const [page, setPage] = useState(1);
   const { askDelete, dialog } = useConfirmDelete(mutate);
   const filteredGuests = data.guests.filter((guest) => {
     const term = filters.search.toLowerCase();
-    const matchesText = [guest.name, guest.phone, guest.group_name, guest.side].join(" ").toLowerCase().includes(term);
+    const matchesText = [guest.name, guest.phone, guest.side].join(" ").toLowerCase().includes(term);
     const matchesStatus = filters.status === "all" || guest.status === filters.status;
     const matchesTable = filters.table === "all" || (filters.table === "none" ? !guest.table_id : guest.table_id === filters.table);
     return matchesText && matchesStatus && matchesTable;
   });
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(filteredGuests.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pageGuests = filteredGuests.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const recentAcceptances = data.recentAcceptances || [];
 
   async function copyLink(guest) {
     await navigator.clipboard.writeText(guest.inviteUrl);
@@ -510,8 +523,26 @@ function Guests({ data, mutate }) {
 
   async function addGuest(event) {
     event.preventDefault();
-    await mutate("/api/guests", { method: "POST", body: JSON.stringify(form) });
+    const name = `${form.first_name} ${form.last_name}`.trim();
+    await mutate("/api/guests", { method: "POST", body: JSON.stringify({ ...form, name }) });
     setForm(emptyGuest);
+    setPage(1);
+  }
+
+  function exportGuests() {
+    const headers = ["Nume", "Prenume", "Telefon", "Status", "Locuri", "Meniu", "Masa", "Link invitatie"];
+    const lines = filteredGuests.map((guest) => {
+      const [firstName, ...rest] = String(guest.name || "").split(" ");
+      const row = [firstName || "", rest.join(" "), guest.phone || "", guest.status || "", guest.seats || "", guest.meal_choice || "", guest.table_label || guest.table_name || "", guest.inviteUrl || ""];
+      return row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(",");
+    });
+    const blob = new Blob([[headers.join(","), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "invitati.csv";
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   return (
@@ -519,10 +550,27 @@ function Guests({ data, mutate }) {
       <div className="module-title">
         <div><p className="eyebrow">Invitati</p><h2>Confirmari detaliate si WhatsApp</h2></div>
       </div>
+      {recentAcceptances.length ? (
+        <section className="acceptance-strip">
+          <div>
+            <p className="eyebrow">{data.notifications?.newAcceptances ? "Confirmari noi" : "Ultimele confirmari"}</p>
+            <h3>{recentAcceptances[0].title}</h3>
+            <small>{recentAcceptances[0].detail}</small>
+          </div>
+          <div className="acceptance-list">
+            {recentAcceptances.slice(0, 3).map((item) => (
+              <article className={!item.seen_at ? "new" : ""} key={item.id}>
+                <strong>{item.title}</strong>
+                <span>{item.detail}</span>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
       <form className="entry-form guests-form" onSubmit={addGuest}>
-        <input required placeholder="Nume invitat" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
+        <input required placeholder="Nume" value={form.first_name} onChange={(event) => setForm({ ...form, first_name: event.target.value })} />
+        <input required placeholder="Prenume" value={form.last_name} onChange={(event) => setForm({ ...form, last_name: event.target.value })} />
         <input placeholder="Telefon 40740..." value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
-        <input placeholder="Grup" value={form.group_name} onChange={(event) => setForm({ ...form, group_name: event.target.value })} />
         <select value={form.side} onChange={(event) => setForm({ ...form, side: event.target.value })}><option>Comun</option><option>Mireasa</option><option>Mire</option></select>
         <input type="number" min="1" max="10" value={form.seats} onChange={(event) => setForm({ ...form, seats: event.target.value })} />
         <select value={form.table_id} onChange={(event) => setForm({ ...form, table_id: event.target.value })}>
@@ -532,17 +580,20 @@ function Guests({ data, mutate }) {
         <button type="submit"><Plus size={18} />Adauga</button>
       </form>
       <div className="filter-bar">
-        <label><Search size={16} />Cauta<input placeholder="Nume, telefon, grup" value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} /></label>
-        <label>Status<select value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })}><option value="all">Toate</option><option>In asteptare</option><option>Confirmat</option><option>Refuzat</option></select></label>
-        <label>Masa<select value={filters.table} onChange={(event) => setFilters({ ...filters, table: event.target.value })}><option value="all">Toate</option><option value="none">Fara masa</option>{data.tables.map((table) => <option value={table.id} key={table.id}>{table.name}</option>)}</select></label>
+        <label><Search size={16} />Cauta<input placeholder="Nume sau telefon" value={filters.search} onChange={(event) => { setFilters({ ...filters, search: event.target.value }); setPage(1); }} /></label>
+        <label>Status<select value={filters.status} onChange={(event) => { setFilters({ ...filters, status: event.target.value }); setPage(1); }}><option value="all">Toate</option><option>In asteptare</option><option>Confirmat</option><option>Refuzat</option></select></label>
+        <label>Masa<select value={filters.table} onChange={(event) => { setFilters({ ...filters, table: event.target.value }); setPage(1); }}><option value="all">Toate</option><option value="none">Fara masa</option>{data.tables.map((table) => <option value={table.id} key={table.id}>{table.name}</option>)}</select></label>
+        <button className="tool-button" onClick={exportGuests} type="button"><Download size={16} />Excel</button>
       </div>
       <div className="table-wrap">
         <table>
           <thead><tr><th>Invitat</th><th>Status</th><th>Locuri</th><th>Meniu</th><th>Masa</th><th>Invitatie</th><th></th></tr></thead>
           <tbody>
-            {filteredGuests.map((guest) => (
+            {pageGuests.map((guest) => {
+              const [firstName, ...restName] = String(guest.name || "").split(" ");
+              return (
               <tr key={guest.id}>
-                <td><strong>{guest.name}</strong><small>{guest.phone || "fara telefon"} - {guest.group_name || guest.side}</small></td>
+                <td><strong>{firstName} {restName.join(" ")}</strong><small>{guest.phone || "fara telefon"} - {guest.side}</small></td>
                 <td><span className={`pill ${guest.status === "Confirmat" ? "yes" : guest.status === "Refuzat" ? "no" : ""}`}>{guest.status}</span></td>
                 <td>{guest.seats} <small>{partyLabel(guest.seats)}</small></td>
                 <td><small>{guest.meal_choice || "-"}</small><small>{guest.allergies || ""}</small></td>
@@ -555,16 +606,40 @@ function Guests({ data, mutate }) {
                 </td>
                 <td><button className="icon-button danger" onClick={() => askDelete(`/api/guests/${guest.id}`, `Stergi invitatul ${guest.name}?`)} title="Sterge" type="button"><Trash2 size={17} /></button></td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
+      </div>
+      <div className="pagination">
+        <span>{filteredGuests.length} invitati - pagina {currentPage} din {totalPages}</span>
+        <div className="row-actions">
+          <button className="tool-button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} type="button">Inapoi</button>
+          <button className="tool-button" disabled={currentPage === totalPages} onClick={() => setPage(currentPage + 1)} type="button">Urmatoarea</button>
+        </div>
       </div>
       {dialog}
     </section>
   );
 }
 
-function Tables({ data, mutate }) {
+function SeatingSection({ data, mutate }) {
+  const [tab, setTab] = useState("tables");
+  return (
+    <section className="module">
+      <div className="module-title seating-title">
+        <div><p className="eyebrow">Sala</p><h2>Mese si plan sala</h2></div>
+        <div className="segmented section-tabs">
+          <button className={tab === "tables" ? "active" : ""} onClick={() => setTab("tables")} type="button">Asezare invitati</button>
+          <button className={tab === "plan" ? "active" : ""} onClick={() => setTab("plan")} type="button">Plan sala</button>
+        </div>
+      </div>
+      {tab === "tables" ? <Tables data={data} embedded mutate={mutate} /> : <RoomPlan data={data} embedded mutate={mutate} />}
+    </section>
+  );
+}
+
+function Tables({ data, mutate, embedded = false }) {
   const [form, setForm] = useState({ name: "", capacity: 8, notes: "" });
   const [search, setSearch] = useState("");
   const { askDelete, dialog } = useConfirmDelete(mutate);
@@ -581,9 +656,8 @@ function Tables({ data, mutate }) {
     mutate(`/api/guests/${guestId}`, { method: "PATCH", body: JSON.stringify({ table_id: tableId }) });
   }
 
-  return (
-    <section className="module">
-      <div className="module-title"><div><p className="eyebrow">Sala</p><h2>Aranjare mese cu capacitate</h2></div></div>
+  const content = (
+    <>
       <form className="entry-form table-form" onSubmit={createTable}>
         <input required placeholder="Nume masa" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
         <input type="number" min="1" max="30" value={form.capacity} onChange={(event) => setForm({ ...form, capacity: event.target.value })} />
@@ -598,7 +672,7 @@ function Tables({ data, mutate }) {
             {unseated.length ? unseated.map((guest) => (
               <div className="guest-chip" draggable onDragStart={(event) => event.dataTransfer.setData("guestId", guest.id)} key={guest.id}>
                 <strong>{guest.name}</strong><small>{guest.seats} locuri</small>
-                <span className="plus-badge">{partyLabel(guest.seats)}</span>
+                {Number(guest.seats || 1) > 1 ? <span className="plus-badge">{partyLabel(guest.seats)}</span> : null}
               </div>
             )) : <p className="empty-state">Toti invitatii confirmati sunt asezati.</p>}
           </div>
@@ -611,7 +685,7 @@ function Tables({ data, mutate }) {
             return (
               <article className={`table-card ${over ? "over" : ""}`} key={table.id} onDragOver={(event) => event.preventDefault()} onDrop={(event) => assignGuest(event.dataTransfer.getData("guestId"), table.id)}>
                 <header>
-                  <div className="table-title"><span className="table-icon" /><div><strong>{table.name}</strong><small>{seats}/{table.capacity} locuri</small></div></div>
+                  <div className="table-title"><span className="table-icon" /><strong>{table.name}</strong><small>{seats}/{table.capacity} locuri</small></div>
                   <button className="icon-button danger" onClick={() => askDelete(`/api/tables/${table.id}`, `Stergi masa ${table.name}? Invitatii de la aceasta masa vor ramane neasezati.`)} type="button"><Trash2 size={17} /></button>
                 </header>
                 {over ? <p className="capacity-warning">Capacitate depasita</p> : null}
@@ -619,7 +693,7 @@ function Tables({ data, mutate }) {
                   {seated.map((guest) => (
                     <div className="guest-chip" key={guest.id}>
                       <span className="guest-name">{guest.name}</span>
-                      <strong className="plus-badge">{partyLabel(guest.seats)}</strong>
+                      {Number(guest.seats || 1) > 1 ? <strong className="plus-badge">{partyLabel(guest.seats)}</strong> : <span />}
                       <button onClick={() => assignGuest(guest.id, "")} type="button">Scoate</button>
                     </div>
                   ))}
@@ -630,11 +704,20 @@ function Tables({ data, mutate }) {
         </section>
       </div>
       {dialog}
+    </>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <section className="module">
+      <div className="module-title"><div><p className="eyebrow">Sala</p><h2>Aranjare mese cu capacitate</h2></div></div>
+      {content}
     </section>
   );
 }
 
-function RoomPlan({ data, mutate }) {
+function RoomPlan({ data, mutate, embedded = false }) {
   const roomMap = Object.fromEntries((data.roomTables || []).map((item) => [item.table_id, item]));
   async function move(tableId, event) {
     const table = data.tables.find((item) => item.id === tableId);
@@ -648,9 +731,11 @@ function RoomPlan({ data, mutate }) {
     const current = roomMap[table.id] || { x: 20, y: 20, shape: "round" };
     await mutate(`/api/room-tables/${table.id}`, { method: "PATCH", body: JSON.stringify({ ...current, shape: current.shape === "round" ? "rect" : "round" }) });
   }
-  return (
-    <section className="module">
-      <div className="module-title"><div><p className="eyebrow">Plan sala</p><h2>Trage vizual mesele in sala</h2></div></div>
+  const content = (
+    <>
+      <div className="room-plan-header">
+        <p className="hint">Trage mesele pentru pozitie. Dublu click pe masa schimba forma.</p>
+      </div>
       <div
         className="room-plan"
         onDragOver={(event) => event.preventDefault()}
@@ -675,6 +760,15 @@ function RoomPlan({ data, mutate }) {
           );
         })}
       </div>
+    </>
+  );
+
+  if (embedded) return content;
+
+  return (
+    <section className="module">
+      <div className="module-title"><div><p className="eyebrow">Plan sala</p><h2>Trage vizual mesele in sala</h2></div></div>
+      {content}
     </section>
   );
 }
@@ -721,7 +815,10 @@ function Suppliers({ data, mutate }) {
   const [form, setForm] = useState({ name: "", category: "", phone: "", email: "", advance: "", total: "", due: "", notes: "", contract: null });
   const [search, setSearch] = useState("");
   const { askDelete, dialog } = useConfirmDelete(mutate);
-  const rows = data.suppliers.filter((supplier) => [supplier.name, supplier.category, supplier.phone, supplier.email].join(" ").toLowerCase().includes(search.toLowerCase()));
+  const rows = data.suppliers.filter((supplier) => [supplier.name, supplier.phone, supplier.email].join(" ").toLowerCase().includes(search.toLowerCase()));
+  const planned = rows.reduce((sum, supplier) => sum + Number(supplier.total || 0), 0);
+  const paid = rows.reduce((sum, supplier) => sum + Number(supplier.advance || 0), 0);
+  const remaining = Math.max(0, planned - paid);
   async function submit(event) {
     event.preventDefault();
     const payload = { ...form };
@@ -735,20 +832,23 @@ function Suppliers({ data, mutate }) {
   }
   return (
     <section className="module">
-      <div className="module-title"><div><p className="eyebrow">Furnizori</p><h2>Contracte, plati si contacte</h2></div></div>
+      <div className="module-title"><div><p className="eyebrow">Financiar</p><h2>Buget calculat din furnizori</h2></div></div>
+      <div className="finance-summary">
+        <article><span>Total contracte</span><strong>{money(planned)}</strong></article>
+        <article><span>Platit / avansuri</span><strong>{money(paid)}</strong></article>
+        <article><span>De plata</span><strong>{money(remaining)}</strong></article>
+      </div>
       <form className="entry-form suppliers-form" onSubmit={submit}>
         <input required placeholder="Furnizor" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
-        <input placeholder="Categorie" value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })} />
         <input placeholder="Telefon" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
         <input placeholder="Email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
-        <input type="number" placeholder="Avans" value={form.advance} onChange={(event) => setForm({ ...form, advance: event.target.value })} />
-        <input type="number" placeholder="Total" value={form.total} onChange={(event) => setForm({ ...form, total: event.target.value })} />
-        <input type="date" value={form.due} onChange={(event) => setForm({ ...form, due: event.target.value })} />
+        <input type="number" min="0" placeholder="Avans platit" value={form.advance} onChange={(event) => setForm({ ...form, advance: event.target.value })} />
+        <input type="number" min="0" placeholder="Total contract" value={form.total} onChange={(event) => setForm({ ...form, total: event.target.value })} />
         <input type="file" accept=".pdf,.doc,.docx,image/*" onChange={(event) => setForm({ ...form, contract: event.target.files?.[0] || null })} />
         <button type="submit"><Plus size={18} />Adauga</button>
       </form>
-      <div className="filter-bar"><label><Search size={16} />Cauta<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Furnizor, categorie, contact" /></label></div>
-      <div className="table-wrap"><table><thead><tr><th>Furnizor</th><th>Contact</th><th>Plati</th><th>Scadenta</th><th>Contract</th><th></th></tr></thead><tbody>{rows.map((supplier) => <tr key={supplier.id}><td><strong>{supplier.name}</strong><small>{supplier.category || "-"}</small></td><td>{supplier.phone || "-"}<small>{supplier.email || ""}</small></td><td>{money(supplier.advance)} / {money(supplier.total)}</td><td>{supplier.due || "-"}</td><td>{supplier.contract_name || "-"}</td><td><button className="icon-button danger" onClick={() => askDelete(`/api/suppliers/${supplier.id}`, `Stergi furnizorul ${supplier.name}?`)} type="button"><Trash2 size={17} /></button></td></tr>)}</tbody></table></div>
+      <div className="filter-bar"><label><Search size={16} />Cauta<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Furnizor sau contact" /></label></div>
+      <div className="table-wrap"><table><thead><tr><th>Furnizor</th><th>Contact</th><th>Avans platit</th><th>Total</th><th>De plata</th><th>Contract</th><th></th></tr></thead><tbody>{rows.map((supplier) => <tr key={supplier.id}><td><strong>{supplier.name}</strong></td><td>{supplier.phone || "-"}<small>{supplier.email || ""}</small></td><td>{money(supplier.advance)}</td><td>{money(supplier.total)}</td><td>{money(Math.max(0, Number(supplier.total || 0) - Number(supplier.advance || 0)))}</td><td>{supplier.contract_name || "-"}</td><td><button className="icon-button danger" onClick={() => askDelete(`/api/suppliers/${supplier.id}`, `Stergi furnizorul ${supplier.name}?`)} type="button"><Trash2 size={17} /></button></td></tr>)}</tbody></table></div>
       {dialog}
     </section>
   );
@@ -803,36 +903,85 @@ function Tasks({ data, mutate }) {
   );
 }
 
-function CalendarView({ data }) {
+function CalendarView({ data, mutate }) {
+  const [form, setForm] = useState({ title: "", due: "", owner: "Amandoi", stage: "General", priority: "Medie" });
+  const [filters, setFilters] = useState({ search: "", done: "all" });
+  const [month, setMonth] = useState((data.wedding.wedding_date || new Date().toISOString().slice(0, 10)).slice(0, 7));
+  const { askDelete, dialog } = useConfirmDelete(mutate);
+  const groups = ["Invitatii", "Restaurant", "Furnizori", "Acte", "Saptamana nuntii", "General"];
   const events = [
     ...(data.wedding.wedding_date ? [{ date: data.wedding.wedding_date, title: `Nunta ${data.wedding.couple}`, type: "Eveniment" }] : []),
     ...data.tasks.filter((task) => task.due).map((task) => ({ date: task.due, title: task.title, type: task.done ? "Finalizat" : "Task", meta: `${task.owner} - ${task.stage}` })),
     ...data.budget.filter((item) => item.due).map((item) => ({ date: item.due, title: `Plata: ${item.item}`, type: item.status, meta: money(item.planned - item.paid) }))
   ].sort((a, b) => a.date.localeCompare(b.date));
+  const tasks = data.tasks.filter((task) => {
+    const matchesText = [task.title, task.owner, task.stage, task.priority].join(" ").toLowerCase().includes(filters.search.toLowerCase());
+    const matchesDone = filters.done === "all" || (filters.done === "done" ? task.done : !task.done);
+    return matchesText && matchesDone;
+  });
+  const monthDate = new Date(`${month}-01T12:00:00`);
+  const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+  const startOffset = (monthStart.getDay() + 6) % 7;
+  const calendarDays = [
+    ...Array.from({ length: startOffset }, () => null),
+    ...Array.from({ length: monthEnd.getDate() }, (_, index) => {
+      const day = index + 1;
+      const date = `${month}-${String(day).padStart(2, "0")}`;
+      return { day, date, events: events.filter((event) => event.date === date) };
+    })
+  ];
 
-  const monthGroups = events.reduce((groups, event) => {
-    const key = event.date.slice(0, 7);
-    groups[key] = groups[key] || [];
-    groups[key].push(event);
-    return groups;
-  }, {});
+  async function submit(event) {
+    event.preventDefault();
+    await mutate("/api/tasks", { method: "POST", body: JSON.stringify(form) });
+    setForm({ title: "", due: "", owner: "Amandoi", stage: "General", priority: "Medie" });
+  }
+
+  function shiftMonth(direction) {
+    const next = new Date(monthDate.getFullYear(), monthDate.getMonth() + direction, 1);
+    setMonth(`${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`);
+  }
 
   return (
     <section className="module">
-      <div className="module-title"><div><p className="eyebrow">Calendar</p><h2>Deadline-uri, plati si ziua nuntii</h2></div></div>
-      <div className="calendar-grid">
-        {Object.entries(monthGroups).length ? Object.entries(monthGroups).map(([month, items]) => (
-          <article className="calendar-month" key={month}>
-            <h3>{new Date(`${month}-01T12:00:00`).toLocaleDateString("ro-RO", { month: "long", year: "numeric" })}</h3>
-            {items.map((event, index) => (
-              <div className="calendar-event" key={`${event.date}-${index}`}>
-                <time>{new Date(`${event.date}T12:00:00`).toLocaleDateString("ro-RO", { day: "numeric", month: "short" })}</time>
-                <div><strong>{event.title}</strong><small>{event.type}{event.meta ? ` - ${event.meta}` : ""}</small></div>
-              </div>
-            ))}
-          </article>
-        )) : <p className="empty-state">Adauga data nuntii, task-uri sau scadente ca sa apara in calendar.</p>}
+      <div className="module-title"><div><p className="eyebrow">Calendar</p><h2>Calendar si checklist</h2></div></div>
+      <form className="entry-form task-form" onSubmit={submit}>
+        <input required placeholder="Sarcina" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />
+        <input type="date" value={form.due} onChange={(event) => setForm({ ...form, due: event.target.value })} />
+        <select value={form.owner} onChange={(event) => setForm({ ...form, owner: event.target.value })}><option>Amandoi</option><option>Mireasa</option><option>Mire</option><option>Familie</option><option>Planner</option></select>
+        <select value={form.stage} onChange={(event) => setForm({ ...form, stage: event.target.value })}>{groups.map((group) => <option key={group}>{group}</option>)}</select>
+        <select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })}><option>Mica</option><option>Medie</option><option>Mare</option></select>
+        <button type="submit"><Plus size={18} />Adauga</button>
+      </form>
+      <div className="calendar-toolbar">
+        <button className="tool-button" onClick={() => shiftMonth(-1)} type="button">Luna trecuta</button>
+        <strong>{monthDate.toLocaleDateString("ro-RO", { month: "long", year: "numeric" })}</strong>
+        <button className="tool-button" onClick={() => shiftMonth(1)} type="button">Luna urmatoare</button>
       </div>
+      <div className="calendar-board">
+        {["Lun", "Mar", "Mie", "Joi", "Vin", "Sam", "Dum"].map((day) => <strong className="calendar-weekday" key={day}>{day}</strong>)}
+        {calendarDays.map((day, index) => day ? (
+          <article className="calendar-day" key={day.date}>
+            <time>{day.day}</time>
+            {day.events.slice(0, 3).map((event, eventIndex) => <span className={`calendar-dot ${event.type === "Eveniment" ? "event" : ""}`} key={`${event.date}-${eventIndex}`}>{event.title}</span>)}
+          </article>
+        ) : <span className="calendar-day muted" key={`empty-${index}`} />)}
+      </div>
+      <div className="filter-bar">
+        <label><Search size={16} />Cauta<input placeholder="Sarcina, responsabil, etapa" value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} /></label>
+        <label>Status<select value={filters.done} onChange={(event) => setFilters({ ...filters, done: event.target.value })}><option value="all">Toate</option><option value="open">Deschise</option><option value="done">Finalizate</option></select></label>
+      </div>
+      <div className="task-list">
+        {tasks.map((task) => (
+          <article className={`task-card ${task.done ? "done" : ""}`} key={task.id}>
+            <input checked={task.done} onChange={(event) => mutate(`/api/tasks/${task.id}`, { method: "PATCH", body: JSON.stringify({ done: event.target.checked }) })} type="checkbox" />
+            <div><strong>{task.title}</strong><small>{task.due || "fara termen"} - {task.owner} - {task.stage} - {task.priority}</small></div>
+            <button className="icon-button danger" onClick={() => askDelete(`/api/tasks/${task.id}`, `Stergi sarcina ${task.title}?`)} type="button"><Trash2 size={17} /></button>
+          </article>
+        ))}
+      </div>
+      {dialog}
     </section>
   );
 }
@@ -843,8 +992,7 @@ function Exports() {
     ["menu", "Meniuri si alergii"],
     ["tables", "Asezare mese"],
     ["tables-pdf", "Asezare mese PDF"],
-    ["budget", "Buget"],
-    ["tasks", "Checklist"]
+    ["budget", "Buget"]
   ];
   return (
     <section className="module">
@@ -918,7 +1066,7 @@ function Photos({ data }) {
             <div className="photo-caption">
               <strong>{upload.file_name}</strong>
               <small>{upload.guest_name || "invitat"} - {Math.round(upload.size / 1024)} KB</small>
-              <a className="tool-button" href={`${upload.url}?download=1`}><Download size={16} />Descarca</a>
+              <button className="tool-button" onClick={() => setActiveIndex(index)} type="button"><Eye size={16} />Vizualizeaza</button>
             </div>
           </article>
         )) : <p className="empty-state">Nu exista uploaduri inca.</p>}
@@ -965,15 +1113,52 @@ function SettingsPanel({ data, mutate }) {
   const [form, setForm] = useState(data.wedding);
   const [uploadingHero, setUploadingHero] = useState(false);
   const [uploadingProfile, setUploadingProfile] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [menuDraft, setMenuDraft] = useState("");
   useEffect(() => setForm(data.wedding), [data.wedding]);
   const program = Array.isArray(form.program) ? form.program : [];
   const menuOptions = Array.isArray(form.menu_options) ? form.menu_options : [];
+  const platformThemes = [
+    { key: "sage", label: "Salvie", colors: ["#668a70", "#b98b42", "#ffffff"] },
+    { key: "rose", label: "Rose", colors: ["#b76e79", "#7d3042", "#fff7f7"] },
+    { key: "navy", label: "Navy", colors: ["#17324d", "#c6a15b", "#ffffff"] },
+    { key: "dark", label: "Dark", colors: ["#13201c", "#d1b76f", "#f5f2ea"] }
+  ];
+  useEffect(() => {
+    const shell = document.querySelector(".app-shell");
+    if (!shell) return undefined;
+    const original = data.wedding.theme_color || "sage";
+    shell.classList.remove("theme-sage", "theme-rose", "theme-navy", "theme-dark");
+    shell.classList.add(`theme-${form.theme_color || "sage"}`);
+    return () => {
+      shell.classList.remove("theme-sage", "theme-rose", "theme-navy", "theme-dark");
+      shell.classList.add(`theme-${original}`);
+    };
+  }, [form.theme_color, data.wedding.theme_color]);
   function setProgram(index, key, value) {
+    setSaved(false);
     setForm({ ...form, program: program.map((item, itemIndex) => itemIndex === index ? { ...item, [key]: value } : item) });
   }
   async function submit(event) {
     event.preventDefault();
-    await mutate("/api/settings", { method: "PUT", body: JSON.stringify(form) });
+    const ok = await mutate("/api/settings", { method: "PUT", body: JSON.stringify(form) });
+    if (ok) {
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 2500);
+    }
+  }
+  function updateForm(next) {
+    setSaved(false);
+    setForm(next);
+  }
+  function addMenuOption() {
+    const value = menuDraft.trim();
+    if (!value || menuOptions.includes(value)) return;
+    updateForm({ ...form, menu_options: [...menuOptions, value] });
+    setMenuDraft("");
+  }
+  function removeMenuOption(option) {
+    updateForm({ ...form, menu_options: menuOptions.filter((item) => item !== option) });
   }
   async function uploadHero(event) {
     const file = event.target.files?.[0];
@@ -992,37 +1177,88 @@ function SettingsPanel({ data, mutate }) {
     setUploadingProfile(false);
   }
   return (
-    <section className="module settings-layout">
-      <div><p className="eyebrow">Pagina publica</p><h2>Invitatie, program, harta si dress code</h2></div>
-      <form className="settings-form" onSubmit={submit}>
-        <label>Mireasa & Mire<input value={form.couple || ""} onChange={(event) => setForm({ ...form, couple: event.target.value })} /></label>
-        <label>Data nuntii<input type="date" value={form.wedding_date || ""} onChange={(event) => setForm({ ...form, wedding_date: event.target.value })} /></label>
-        <label>Ora nuntii<input type="time" value={form.wedding_time || ""} onChange={(event) => setForm({ ...form, wedding_time: event.target.value })} /></label>
-        <label>Locatie<input value={form.venue || ""} onChange={(event) => setForm({ ...form, venue: event.target.value })} /></label>
-        <label>Adresa<input value={form.venue_address || ""} onChange={(event) => setForm({ ...form, venue_address: event.target.value })} /></label>
-        <label>Link Google Maps<input value={form.map_url || ""} onChange={(event) => setForm({ ...form, map_url: event.target.value })} /></label>
-        <label>Dress code<input value={form.dress_code || ""} onChange={(event) => setForm({ ...form, dress_code: event.target.value })} /></label>
-        <label>Imagine hero URL<input value={form.hero_image_url || ""} onChange={(event) => setForm({ ...form, hero_image_url: event.target.value })} /></label>
-        <label>Incarca imagine hero<input type="file" accept="image/*" onChange={uploadHero} /></label>
-        {uploadingHero ? <p className="hint">Se incarca imaginea...</p> : null}
-        <label>Poza de profil cu mirii<input type="file" accept="image/*" onChange={uploadProfile} /></label>
-        {uploadingProfile ? <p className="hint">Se incarca poza de profil...</p> : null}
-        <label>Tema platforma<select value={form.theme_color || "sage"} onChange={(event) => setForm({ ...form, theme_color: event.target.value })}><option value="sage">Verde salvie / auriu / alb</option><option value="rose">Roz prafuit / burgundy / alb</option><option value="navy">Bleumarin / auriu / alb</option><option value="dark">Intunecat / auriu / negru</option></select></label>
-        <label>Text invitatie<textarea value={form.invite_intro || ""} onChange={(event) => setForm({ ...form, invite_intro: event.target.value })} /></label>
-        <label>Mesaj WhatsApp<textarea value={form.whatsapp_message || ""} onChange={(event) => setForm({ ...form, whatsapp_message: event.target.value })} /></label>
-        <label>Optiuni meniu pentru invitati<textarea value={menuOptions.join("\n")} onChange={(event) => setForm({ ...form, menu_options: event.target.value.split("\n").map((item) => item.trim()).filter(Boolean) })} /></label>
-        <div className="program-editor">
-          <h3>Programul zilei</h3>
-          {program.map((item, index) => (
-            <div className="program-row" key={index}>
-              <input value={item.time || ""} placeholder="Ora" onChange={(event) => setProgram(index, "time", event.target.value)} />
-              <input value={item.title || ""} placeholder="Moment" onChange={(event) => setProgram(index, "title", event.target.value)} />
-              <button type="button" onClick={() => setForm({ ...form, program: program.filter((_, itemIndex) => itemIndex !== index) })}>Sterge</button>
+    <section className="module settings-page">
+      <div className="settings-header"><p className="eyebrow">Setari</p><h2>Configurare nunta si invitatie</h2></div>
+      <form className="settings-form settings-card" onSubmit={submit}>
+        <fieldset>
+          <legend>Invitatie - Detalii eveniment</legend>
+          <div className="settings-grid two">
+            <label>Mireasa & Mire<input value={form.couple || ""} onChange={(event) => updateForm({ ...form, couple: event.target.value })} /></label>
+            <label>Locatie<input value={form.venue || ""} onChange={(event) => updateForm({ ...form, venue: event.target.value })} /></label>
+            <label>Data nuntii<input type="date" value={form.wedding_date || ""} onChange={(event) => updateForm({ ...form, wedding_date: event.target.value })} /></label>
+            <label>Ora nuntii<input type="time" value={form.wedding_time || ""} onChange={(event) => updateForm({ ...form, wedding_time: event.target.value })} /></label>
+            <label>Adresa<input value={form.venue_address || ""} onChange={(event) => updateForm({ ...form, venue_address: event.target.value })} /></label>
+            <label>Link Google Maps<input value={form.map_url || ""} onChange={(event) => updateForm({ ...form, map_url: event.target.value })} /></label>
+            <label>Dress code<input value={form.dress_code || ""} onChange={(event) => updateForm({ ...form, dress_code: event.target.value })} /></label>
+            <label>Imagine invitatie URL ({inviteImageResolution})<input value={form.hero_image_url || ""} onChange={(event) => updateForm({ ...form, hero_image_url: event.target.value })} /></label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Platforma - Design intern</legend>
+          <div className="settings-choice-block">
+            <span>Tema platforma</span>
+            <div className="theme-dots">
+              {platformThemes.map((theme) => (
+                <button className={form.theme_color === theme.key ? "selected" : ""} key={theme.key} onClick={() => updateForm({ ...form, theme_color: theme.key })} type="button">
+                  <span className="dot-stack">{theme.colors.map((color) => <i key={color} style={{ background: color }} />)}</span>
+                  <strong>{theme.label}</strong>
+                </button>
+              ))}
             </div>
-          ))}
-          <button type="button" onClick={() => setForm({ ...form, program: [...program, { time: "", title: "" }] })}>Adauga moment</button>
-        </div>
-        <button type="submit">Salveaza setarile</button>
+          </div>
+          <div className={`platform-preview theme-${form.theme_color || "sage"}`}>
+            <aside><span /> <strong>{form.couple || "Mireasa & Mire"}</strong></aside>
+            <main><b>Preview platforma</b><small>Carduri, meniuri si formulare</small></main>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Invitatie - Imagini</legend>
+          <div className="settings-grid two">
+            <label>Incarca imagine invitatie ({inviteImageResolution})<input type="file" accept="image/*" onChange={uploadHero} /></label>
+            <label>Poza de profil cu mirii<input type="file" accept="image/*" onChange={uploadProfile} /></label>
+          </div>
+          {uploadingHero ? <p className="hint">Se incarca imaginea hero...</p> : null}
+          {uploadingProfile ? <p className="hint">Se incarca poza de profil...</p> : null}
+        </fieldset>
+
+        <fieldset>
+          <legend>Invitatie - Texte si meniu</legend>
+          <label>Text invitatie<textarea value={form.invite_intro || ""} onChange={(event) => updateForm({ ...form, invite_intro: event.target.value })} /></label>
+          <label>Mesaj WhatsApp<textarea value={form.whatsapp_message || ""} onChange={(event) => updateForm({ ...form, whatsapp_message: event.target.value })} /></label>
+          <div className="menu-builder">
+            <span>Optiuni meniu pentru invitati</span>
+            <div className="menu-builder-row">
+              <input placeholder="Ex: Vita, Peste, Vegetarian" value={menuDraft} onChange={(event) => setMenuDraft(event.target.value)} onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  addMenuOption();
+                }
+              }} />
+              <button type="button" onClick={addMenuOption}><Plus size={17} />Adauga meniu</button>
+            </div>
+            <div className="menu-option-list">
+              {menuOptions.length ? menuOptions.map((option) => <button key={option} onClick={() => removeMenuOption(option)} type="button">{option}<Trash2 size={14} /></button>) : <small>Adauga cel putin un meniu ca invitatii sa poata alege.</small>}
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend>Invitatie - Programul zilei</legend>
+          <div className="program-editor">
+            {program.map((item, index) => (
+              <div className="program-row" key={index}>
+                <input value={item.time || ""} placeholder="Ora" onChange={(event) => setProgram(index, "time", event.target.value)} />
+                <input value={item.title || ""} placeholder="Moment" onChange={(event) => setProgram(index, "title", event.target.value)} />
+                <button type="button" onClick={() => updateForm({ ...form, program: program.filter((_, itemIndex) => itemIndex !== index) })}>Sterge</button>
+              </div>
+            ))}
+            <button type="button" onClick={() => updateForm({ ...form, program: [...program, { time: "", title: "" }] })}>Adauga moment</button>
+          </div>
+        </fieldset>
+        {saved ? <p className="save-notice"><Check size={18} />Setarile au fost salvate.</p> : null}
+        <button className="settings-save" type="submit">Salveaza setarile</button>
       </form>
     </section>
   );
@@ -1053,32 +1289,50 @@ function InvitationPage({ token }) {
   const wedding = data.wedding;
   const locked = saved || data.guest.response_locked || data.guest.status !== "In asteptare";
   const menuOptions = Array.isArray(wedding.menu_options) && wedding.menu_options.length ? wedding.menu_options : ["Carne", "Peste", "Vegetarian", "Copil"];
+  const heroStyle = { backgroundImage: `linear-gradient(rgba(36,45,48,.38), rgba(36,45,48,.12)), url(${wedding.hero_image_url || "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1800&q=80"})` };
+  const details = (
+    <div className="invite-facts">
+      <span><CalendarDays size={18} />{dateLabel(wedding.wedding_date)}{wedding.wedding_time ? `, ora ${wedding.wedding_time}` : ""}</span>
+      <span><MapPin size={18} />Ceremonie: {wedding.venue || "Locatie necompletata"}</span>
+      <span><MapPin size={18} />Petrecere: {wedding.venue || "Locatie necompletata"}</span>
+      <span><Shirt size={18} />{wedding.dress_code || "Dress code liber"}</span>
+    </div>
+  );
+  const programBlock = <div className="timeline">{wedding.program.map((item, index) => <p key={index}><strong>{item.time}</strong><span>{item.title}</span></p>)}</div>;
+  const rsvpBlock = locked ? <div className="success-box"><Check size={22} />Raspunsul tau a fost salvat. Multumim! Nu mai poate fi modificat din acest link.</div> : (
+    <form className="rsvp-form" onSubmit={async (event) => { event.preventDefault(); await api(`/api/invite/${token}`, { method: "POST", body: JSON.stringify(form) }); setSaved(true); }}>
+      <label>Raspuns<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}><option>Confirmat</option><option>Refuzat</option><option>In asteptare</option></select></label>
+      <label>Numar persoane<input type="number" min="1" max="10" value={form.seats} onChange={(event) => setForm({ ...form, seats: event.target.value })} /></label>
+      <label>Meniu<select value={form.meal_choice} onChange={(event) => setForm({ ...form, meal_choice: event.target.value })}><option value="">Alege meniu</option>{menuOptions.map((item) => <option key={item}>{item}</option>)}</select></label>
+      <label>Alergii / restrictii<textarea value={form.allergies} onChange={(event) => setForm({ ...form, allergies: event.target.value })} /></label>
+      <label>Mesaj pentru miri<textarea value={form.guest_message} onChange={(event) => setForm({ ...form, guest_message: event.target.value })} /></label>
+      <button type="submit">Trimite raspunsul</button>
+    </form>
+  );
+
   return (
-    <main className="public-page regency-page">
-      <section className="public-hero regency-hero" style={{ backgroundImage: `linear-gradient(rgba(36,45,48,.38), rgba(36,45,48,.12)), url(${wedding.hero_image_url || "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1800&q=80"})` }}>
-        <div><p className="eyebrow">Cu deosebita placere</p><h1>{wedding.couple}</h1><p>{wedding.invite_intro}</p></div>
+    <main className="public-page custom-invite-page">
+      <section className="custom-invite-hero" style={heroStyle}>
+        <div>
+          <p>Invitatie de nunta</p>
+          <h1>{wedding.couple}</h1>
+          <span>{dateLabel(wedding.wedding_date)}{wedding.wedding_time ? `, ora ${wedding.wedding_time}` : ""}</span>
+        </div>
       </section>
-      <section className="public-content">
-        <article className="invite-card public-card regency-card">
-          <h2>{data.guest.name}, ne bucuram sa iti trimitem invitatia.</h2>
-          <div className="invite-facts">
-            <span><CalendarDays size={18} />{dateLabel(wedding.wedding_date)}{wedding.wedding_time ? `, ora ${wedding.wedding_time}` : ""}</span>
-            <span><MapPin size={18} />{wedding.venue || "Locatie necompletata"}</span>
-            <span><Shirt size={18} />{wedding.dress_code || "Dress code liber"}</span>
-          </div>
-          {wedding.map_url ? <a className="tool-button" href={wedding.map_url} target="_blank" rel="noreferrer">Deschide harta</a> : null}
-          <h3>Program</h3>
-          <div className="timeline">{wedding.program.map((item, index) => <p key={index}><strong>{item.time}</strong><span>{item.title}</span></p>)}</div>
-          {locked ? <div className="success-box"><Check size={22} />Raspunsul tau a fost salvat. Multumim! Nu mai poate fi modificat din acest link.</div> : (
-            <form className="rsvp-form" onSubmit={async (event) => { event.preventDefault(); await api(`/api/invite/${token}`, { method: "POST", body: JSON.stringify(form) }); setSaved(true); }}>
-              <label>Raspuns<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}><option>Confirmat</option><option>Refuzat</option><option>In asteptare</option></select></label>
-              <label>Numar persoane<input type="number" min="1" max="10" value={form.seats} onChange={(event) => setForm({ ...form, seats: event.target.value })} /></label>
-              <label>Meniu<select value={form.meal_choice} onChange={(event) => setForm({ ...form, meal_choice: event.target.value })}><option value="">Alege meniu</option>{menuOptions.map((item) => <option key={item}>{item}</option>)}</select></label>
-              <label>Alergii / restrictii<textarea value={form.allergies} onChange={(event) => setForm({ ...form, allergies: event.target.value })} /></label>
-              <label>Mesaj pentru miri<textarea value={form.guest_message} onChange={(event) => setForm({ ...form, guest_message: event.target.value })} /></label>
-              <button type="submit">Trimite raspunsul</button>
-            </form>
-          )}
+      <section className="custom-invite-content">
+        <article className="custom-invite-card">
+          <p className="eyebrow">Pentru {data.guest.name}</p>
+          <h2>Te asteptam cu drag</h2>
+          <p className="invite-copy">{wedding.invite_intro}</p>
+          {details}
+        </article>
+        <article className="custom-invite-card">
+          <h2>Program</h2>
+          {programBlock}
+        </article>
+        <article className="custom-invite-card rsvp-slot">
+          <h2>Confirmare participare</h2>
+          {rsvpBlock}
         </article>
       </section>
     </main>
