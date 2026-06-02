@@ -13,6 +13,7 @@ import {
   LogOut,
   MapPin,
   MessageCircle,
+  Pencil,
   Plus,
   QrCode,
   Settings,
@@ -28,9 +29,11 @@ import {
   Clock,
   FileText,
   Search,
-  ShieldCheck
+  ShieldCheck,
+  X
 } from "lucide-react";
 import "./styles.css";
+import templateOneIcon from "./invitatii-personalizate/Template 1/wedding-icon.svg";
 
 const emptyGuest = {
   first_name: "",
@@ -46,10 +49,56 @@ const emptyGuest = {
   table_id: ""
 };
 
+function splitGuestName(name = "") {
+  const [firstName, ...rest] = String(name || "").trim().split(/\s+/).filter(Boolean);
+  return { first_name: firstName || "", last_name: rest.join(" ") };
+}
+
+function prettyFileLabel(files, fallback = "Alege fisiere") {
+  const list = Array.from(files || []);
+  if (!list.length) return fallback;
+  if (list.length === 1) return list[0].name;
+  return `${list.length} fisiere selectate`;
+}
+
+function normalizeSeatCount(value) {
+  return Math.max(1, Math.min(10, Number(value) || 1));
+}
+
+function mealChoicesForSeats(existing, seats, fallback = "") {
+  const count = normalizeSeatCount(seats);
+  const choices = Array.isArray(existing) ? existing.slice(0, count) : [];
+  while (choices.length < count) choices.push(choices.length === 0 ? fallback : "");
+  return choices;
+}
+
+function mealSummary(guest) {
+  const choices = Array.isArray(guest.meal_choices) && guest.meal_choices.length ? guest.meal_choices.filter(Boolean) : [];
+  if (!choices.length) return guest.meal_choice || "-";
+  return choices.map((choice, index) => `${index + 1}. ${choice}`).join(", ");
+}
+
+function isVideoUrl(url = "") {
+  return /\.(mp4|webm|mov)(\?|#|$)/i.test(String(url));
+}
+
+function roleLevel(role) {
+  return ({ viewer: 1, planner: 2, owner: 3, super_admin: 4 })[role] || 0;
+}
+
+function canRole(role, required) {
+  return roleLevel(role) >= roleLevel(required);
+}
+
+const invitationTemplates = [
+  { key: "custom", title: "Template 1", description: "Layout cu 2 media, RSVP si program", resolution: "1920x1080 px", secondaryResolution: "1200x900 px", icon: templateOneIcon }
+];
+
 async function api(path, options = {}) {
+  const csrfToken = document.cookie.split("; ").find((item) => item.startsWith("csrf_token="))?.split("=")[1] || "";
   const response = await fetch(path, {
     credentials: "include",
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
+    headers: { "Content-Type": "application/json", ...(csrfToken ? { "X-CSRF-Token": decodeURIComponent(csrfToken) } : {}), ...(options.headers || {}) },
     ...options
   });
   const data = await response.json().catch(() => ({}));
@@ -136,7 +185,7 @@ function ScreenLoader() {
   return <main className="center-screen"><div className="wedding-loader"><span /> <strong>Se incarca platforma</strong></div></main>;
 }
 
-function ConfirmDialog({ title = "Esti sigur?", message, onCancel, onConfirm }) {
+function ConfirmDialog({ title = "Esti sigur?", message, confirmLabel = "Sterge", onCancel, onConfirm }) {
   return (
     <div className="confirm-backdrop" role="dialog" aria-modal="true">
       <section className="confirm-dialog">
@@ -144,7 +193,7 @@ function ConfirmDialog({ title = "Esti sigur?", message, onCancel, onConfirm }) 
         <p>{message}</p>
         <div className="row-actions">
           <button className="tool-button" onClick={onCancel} type="button">Anuleaza</button>
-          <button className="tool-button danger-fill" onClick={onConfirm} type="button">Sterge</button>
+          <button className="tool-button danger-fill" onClick={onConfirm} type="button">{confirmLabel}</button>
         </div>
       </section>
     </div>
@@ -173,14 +222,21 @@ function AuthScreen({ onAuth }) {
   const [login, setLogin] = useState({ email: "admin@nunta.local", password: "admin123" });
   const [register, setRegister] = useState({ name: "", email: "", password: "", couple: "", wedding_date: "", venue: "" });
   const [error, setError] = useState("");
+  const [loadingMessage, setLoadingMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   async function submitLogin(event) {
     event.preventDefault();
     setError("");
+    setSuccessMessage("");
+    setLoadingMessage("Se verifica datele contului...");
     try {
       await api("/api/login", { method: "POST", body: JSON.stringify(login) });
-      onAuth(await api("/api/session"));
+      const session = await api("/api/session");
+      setLoadingMessage("Se incarca platforma...");
+      window.setTimeout(() => onAuth(session), 700);
     } catch (err) {
+      setLoadingMessage("");
       setError(err.message);
     }
   }
@@ -188,10 +244,19 @@ function AuthScreen({ onAuth }) {
   async function submitRegister(event) {
     event.preventDefault();
     setError("");
+    setSuccessMessage("");
+    setLoadingMessage("Se creeaza contul...");
     try {
       await api("/api/register", { method: "POST", body: JSON.stringify(register) });
-      onAuth(await api("/api/session"));
+      setLoadingMessage("");
+      setSuccessMessage("Cont inregistrat cu succes. Te trimitem la conectare.");
+      setRegister({ name: "", email: "", password: "", couple: "", wedding_date: "", venue: "" });
+      window.setTimeout(() => {
+        setMode("login");
+        setSuccessMessage("");
+      }, 1400);
     } catch (err) {
+      setLoadingMessage("");
       setError(err.message);
     }
   }
@@ -204,15 +269,17 @@ function AuthScreen({ onAuth }) {
           <h1>{mode === "login" ? "Autentificare" : "Creeaza cont si nunta"}</h1>
         </div>
         <div className="segmented">
-          <button className={mode === "login" ? "active" : ""} onClick={() => setMode("login")} type="button">Login</button>
-          <button className={mode === "register" ? "active" : ""} onClick={() => setMode("register")} type="button">Cont nou</button>
+          <button className={mode === "login" ? "active" : ""} onClick={() => { setMode("login"); setError(""); setSuccessMessage(""); }} type="button">Login</button>
+          <button className={mode === "register" ? "active" : ""} onClick={() => { setMode("register"); setError(""); setSuccessMessage(""); }} type="button">Cont nou</button>
         </div>
+        {loadingMessage ? <div className="auth-status"><span /> <strong>{loadingMessage}</strong></div> : null}
+        {successMessage ? <div className="auth-success"><Check size={20} />{successMessage}</div> : null}
         {mode === "login" ? (
           <form className="login-form" onSubmit={submitLogin}>
             <label>Email<input value={login.email} onChange={(event) => setLogin({ ...login, email: event.target.value })} /></label>
             <label>Parola<input type="password" value={login.password} onChange={(event) => setLogin({ ...login, password: event.target.value })} /></label>
             {error ? <p className="form-error">{error}</p> : null}
-            <button type="submit">Intra in platforma</button>
+            <button disabled={Boolean(loadingMessage)} type="submit">Intra in platforma</button>
           </form>
         ) : (
           <form className="login-form register-grid" onSubmit={submitRegister}>
@@ -223,7 +290,7 @@ function AuthScreen({ onAuth }) {
             <label>Data nuntii<input type="date" value={register.wedding_date} onChange={(event) => setRegister({ ...register, wedding_date: event.target.value })} /></label>
             <label>Locatie<input value={register.venue} onChange={(event) => setRegister({ ...register, venue: event.target.value })} /></label>
             {error ? <p className="form-error span-2">{error}</p> : null}
-            <button className="span-2" type="submit">Creeaza contul</button>
+            <button className="span-2" disabled={Boolean(loadingMessage)} type="submit">Creeaza contul</button>
           </form>
         )}
       </section>
@@ -235,6 +302,7 @@ function Dashboard({ session, onLogout }) {
   const [data, setData] = useState(null);
   const [active, setActive] = useState("guests");
   const [error, setError] = useState("");
+  const [logoutConfirm, setLogoutConfirm] = useState(false);
 
   useEffect(() => { refresh(); }, []);
   useEffect(() => {
@@ -275,19 +343,20 @@ function Dashboard({ session, onLogout }) {
   const paid = data.suppliers.reduce((sum, item) => sum + Number(item.advance || 0), 0);
   const planned = data.suppliers.reduce((sum, item) => sum + Number(item.total || 0), 0);
   const done = data.tasks.filter((task) => task.done).length;
+  const role = data.wedding.role || "viewer";
   const tabs = [
     ...(session.user.isSuperAdmin ? [["admin", "Super Admin", ShieldCheck]] : []),
     ["progress", "Progres", BarChart3],
     ["guests", "Invitati", Users],
     ["tables", "Mese", Table2],
-    ["suppliers", "Buget & Furnizori", WalletCards],
+    ["suppliers", "Financiar", WalletCards],
     ["calendar", "Calendar", CalendarDays],
+    ["invitation", "Invitatie", FileText],
     ["exports", "Export", Download],
     ["media", "QR Media", QrCode],
     ["photos", "Poze", Camera],
-    ["team", "Roluri", UserPlus],
-    ["settings", "Setari", Settings]
-  ];
+    ...(canRole(role, "owner") ? [["team", "Roluri", UserPlus], ["settings", "Setari", Settings]] : [])
+  ].filter(([key]) => canRole(role, "owner") || !["invitation"].includes(key));
 
   return (
     <div className={`app-shell theme-${data.wedding.theme_color || "sage"}`}>
@@ -305,8 +374,8 @@ function Dashboard({ session, onLogout }) {
           {tabs.map(([key, label, Icon]) => (
             <button className={active === key ? "active" : ""} key={key} onClick={() => {
               setActive(key);
-              if (key === "guests" && data.notifications?.newAcceptances) mutate("/api/rsvp-acceptances/seen", { method: "POST" });
-              if (key === "photos" && data.notifications?.newUploads) mutate("/api/media-uploads/seen", { method: "POST" });
+              if (canRole(data.wedding.role, "planner") && key === "guests" && data.notifications?.newAcceptances) mutate("/api/rsvp-acceptances/seen", { method: "POST" });
+              if (canRole(data.wedding.role, "planner") && key === "photos" && data.notifications?.newUploads) mutate("/api/media-uploads/seen", { method: "POST" });
             }} type="button">
               <Icon size={18} />{label}
               {key === "guests" && data.notifications?.newAcceptances ? <span className="nav-badge">{data.notifications.newAcceptances}</span> : null}
@@ -314,10 +383,6 @@ function Dashboard({ session, onLogout }) {
             </button>
           ))}
         </nav>
-        <div className="sidebar-footer">
-          <span>{session.user.name}</span>
-          <button onClick={logout} type="button"><LogOut size={18} />Deconectare</button>
-        </div>
       </aside>
 
       <main className="workspace">
@@ -325,6 +390,10 @@ function Dashboard({ session, onLogout }) {
           <div>
             <p className="eyebrow">Panou organizatori</p>
             <h1>{data.wedding.couple}</h1>
+          </div>
+          <div className="user-tools">
+            <span>{session.user.name}</span>
+            <button className="icon-button" onClick={() => setLogoutConfirm(true)} title="Deconectare" type="button"><LogOut size={18} /></button>
           </div>
         </header>
 
@@ -345,11 +414,20 @@ function Dashboard({ session, onLogout }) {
         {active === "tables" ? <SeatingSection data={data} mutate={mutate} /> : null}
         {active === "suppliers" ? <Suppliers data={data} mutate={mutate} /> : null}
         {active === "calendar" ? <CalendarView data={data} mutate={mutate} /> : null}
+        {active === "invitation" ? <InvitationSettings data={data} mutate={mutate} /> : null}
         {active === "exports" ? <Exports /> : null}
         {active === "media" ? <MediaQr data={data} /> : null}
         {active === "photos" ? <Photos data={data} /> : null}
         {active === "team" ? <Team data={data} mutate={mutate} /> : null}
         {active === "settings" ? <SettingsPanel data={data} mutate={mutate} /> : null}
+        {logoutConfirm ? (
+          <ConfirmDialog
+            confirmLabel="Deconectare"
+            message="Esti sigur ca vrei sa te deconectezi?"
+            onCancel={() => setLogoutConfirm(false)}
+            onConfirm={logout}
+          />
+        ) : null}
       </main>
     </div>
   );
@@ -392,7 +470,7 @@ function SuperAdmin({ mutate }) {
   const [admin, setAdmin] = useState(null);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-  const [client, setClient] = useState({ name: "", email: "", password: "client123", couple: "", wedding_date: "", wedding_time: "", venue: "" });
+  const [client, setClient] = useState({ name: "", email: "", password: "Client123!", couple: "", wedding_date: "", wedding_time: "", venue: "" });
 
   useEffect(() => {
     api("/api/admin/dashboard").then(setAdmin).catch((err) => setError(err.message));
@@ -417,7 +495,7 @@ function SuperAdmin({ mutate }) {
         event.preventDefault();
         const updated = await api("/api/admin/clients", { method: "POST", body: JSON.stringify(client) });
         setAdmin(updated);
-        setClient({ name: "", email: "", password: "client123", couple: "", wedding_date: "", wedding_time: "", venue: "" });
+        setClient({ name: "", email: "", password: "Client123!", couple: "", wedding_date: "", wedding_time: "", venue: "" });
       }}>
         <input required placeholder="Nume client" value={client.name} onChange={(event) => setClient({ ...client, name: event.target.value })} />
         <input required placeholder="Email" value={client.email} onChange={(event) => setClient({ ...client, email: event.target.value })} />
@@ -444,7 +522,7 @@ function SuperAdmin({ mutate }) {
                 <td>
                   <div className="row-actions">
                     <button className="tool-button" onClick={() => mutate(`/api/weddings/${wedding.id}/select`, { method: "POST" })} type="button"><Eye size={17} />Intra</button>
-                    <button className="tool-button" onClick={async () => setAdmin(await api(`/api/admin/users/${wedding.owner_id}/reset-password`, { method: "POST", body: JSON.stringify({ password: "client123" }) }))} type="button">Reset</button>
+                    <button className="tool-button" onClick={async () => setAdmin(await api(`/api/admin/users/${wedding.owner_id}/reset-password`, { method: "POST", body: JSON.stringify({ password: "Client123!" }) }))} type="button">Reset</button>
                     <button className="tool-button" onClick={async () => setAdmin(await api(`/api/admin/users/${wedding.owner_id}/status`, { method: "POST", body: JSON.stringify({ status: wedding.status === "inactive" ? "active" : "inactive" }) }))} type="button">{wedding.status === "inactive" ? "Activeaza" : "Dezactiveaza"}</button>
                   </div>
                 </td>
@@ -469,7 +547,13 @@ function ProgressReports({ data }) {
   const budgetPaid = data.suppliers.reduce((sum, item) => sum + Number(item.advance || 0), 0);
   const budgetPlan = data.suppliers.reduce((sum, item) => sum + Number(item.total || 0), 0) || 1;
   const menuCounts = data.guests.reduce((counts, guest) => {
-    if (guest.status === "Confirmat") counts[guest.meal_choice || "Neales"] = (counts[guest.meal_choice || "Neales"] || 0) + Number(guest.seats || 1);
+    if (guest.status === "Confirmat") {
+      const choices = Array.isArray(guest.meal_choices) && guest.meal_choices.length ? guest.meal_choices : [guest.meal_choice || "Neales"];
+      choices.forEach((choice) => {
+        const key = choice || "Neales";
+        counts[key] = (counts[key] || 0) + 1;
+      });
+    }
     return counts;
   }, {});
   const score = Math.round(((confirmed / invited) * 0.28 + (seated / Math.max(confirmed, 1)) * 0.24 + (tasksDone / Math.max(data.tasks.length, 1)) * 0.28 + (budgetPaid / budgetPlan) * 0.2) * 100);
@@ -498,10 +582,12 @@ function ReportBar({ label, value, total, moneyMode = false }) {
 
 function Guests({ data, mutate }) {
   const [form, setForm] = useState(emptyGuest);
+  const [editGuest, setEditGuest] = useState(null);
   const [copied, setCopied] = useState("");
   const [filters, setFilters] = useState({ search: "", status: "all", table: "all" });
   const [page, setPage] = useState(1);
   const { askDelete, dialog } = useConfirmDelete(mutate);
+  const canEdit = canRole(data.wedding.role, "planner");
   const filteredGuests = data.guests.filter((guest) => {
     const term = filters.search.toLowerCase();
     const matchesText = [guest.name, guest.phone, guest.side].join(" ").toLowerCase().includes(term);
@@ -529,11 +615,34 @@ function Guests({ data, mutate }) {
     setPage(1);
   }
 
+  function startEditGuest(guest) {
+    const parts = splitGuestName(guest.name);
+    setEditGuest({
+      id: guest.id,
+      first_name: parts.first_name,
+      last_name: parts.last_name,
+      phone: guest.phone || "",
+      side: guest.side || "Comun",
+      status: guest.status || "In asteptare",
+      seats: guest.seats || 1,
+      meal_choice: guest.meal_choice || "",
+      allergies: guest.allergies || "",
+      table_id: guest.table_id || ""
+    });
+  }
+
+  async function saveGuestEdit(event) {
+    event.preventDefault();
+    const name = `${editGuest.first_name} ${editGuest.last_name}`.trim();
+    const ok = await mutate(`/api/guests/${editGuest.id}`, { method: "PATCH", body: JSON.stringify({ ...editGuest, name }) });
+    if (ok) setEditGuest(null);
+  }
+
   function exportGuests() {
     const headers = ["Nume", "Prenume", "Telefon", "Status", "Locuri", "Meniu", "Masa", "Link invitatie"];
     const lines = filteredGuests.map((guest) => {
       const [firstName, ...rest] = String(guest.name || "").split(" ");
-      const row = [firstName || "", rest.join(" "), guest.phone || "", guest.status || "", guest.seats || "", guest.meal_choice || "", guest.table_label || guest.table_name || "", guest.inviteUrl || ""];
+      const row = [firstName || "", rest.join(" "), guest.phone || "", guest.status || "", guest.seats || "", mealSummary(guest), guest.table_label || guest.table_name || "", guest.inviteUrl || ""];
       return row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(",");
     });
     const blob = new Blob([[headers.join(","), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
@@ -567,7 +676,7 @@ function Guests({ data, mutate }) {
           </div>
         </section>
       ) : null}
-      <form className="entry-form guests-form" onSubmit={addGuest}>
+      {canEdit ? <form className="entry-form guests-form" onSubmit={addGuest}>
         <input required placeholder="Nume" value={form.first_name} onChange={(event) => setForm({ ...form, first_name: event.target.value })} />
         <input required placeholder="Prenume" value={form.last_name} onChange={(event) => setForm({ ...form, last_name: event.target.value })} />
         <input placeholder="Telefon 40740..." value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
@@ -578,7 +687,7 @@ function Guests({ data, mutate }) {
           {data.tables.map((table) => <option value={table.id} key={table.id}>{table.name}</option>)}
         </select>
         <button type="submit"><Plus size={18} />Adauga</button>
-      </form>
+      </form> : null}
       <div className="filter-bar">
         <label><Search size={16} />Cauta<input placeholder="Nume sau telefon" value={filters.search} onChange={(event) => { setFilters({ ...filters, search: event.target.value }); setPage(1); }} /></label>
         <label>Status<select value={filters.status} onChange={(event) => { setFilters({ ...filters, status: event.target.value }); setPage(1); }}><option value="all">Toate</option><option>In asteptare</option><option>Confirmat</option><option>Refuzat</option></select></label>
@@ -591,21 +700,51 @@ function Guests({ data, mutate }) {
           <tbody>
             {pageGuests.map((guest) => {
               const [firstName, ...restName] = String(guest.name || "").split(" ");
+              const isEditing = editGuest?.id === guest.id;
               return (
-              <tr key={guest.id}>
-                <td><strong>{firstName} {restName.join(" ")}</strong><small>{guest.phone || "fara telefon"} - {guest.side}</small></td>
-                <td><span className={`pill ${guest.status === "Confirmat" ? "yes" : guest.status === "Refuzat" ? "no" : ""}`}>{guest.status}</span></td>
-                <td>{guest.seats} <small>{partyLabel(guest.seats)}</small></td>
-                <td><small>{guest.meal_choice || "-"}</small><small>{guest.allergies || ""}</small></td>
-                <td>{guest.table_label || guest.table_name || "-"}</td>
-                <td>
-                  <div className="row-actions">
-                    <a className="tool-button whatsapp" href={guest.whatsappUrl} target="_blank" rel="noreferrer" onClick={() => mutate(`/api/guests/${guest.id}`, { method: "PATCH", body: JSON.stringify({ table_id: guest.table_id || "", invitation_sent: 1 }) })}><MessageCircle size={17} />WhatsApp</a>
-                    <button className="tool-button" onClick={() => copyLink(guest)} type="button">{copied === guest.id ? <Check size={17} /> : <Copy size={17} />}{copied === guest.id ? "Copiat" : "Link"}</button>
-                  </div>
-                </td>
-                <td><button className="icon-button danger" onClick={() => askDelete(`/api/guests/${guest.id}`, `Stergi invitatul ${guest.name}?`)} title="Sterge" type="button"><Trash2 size={17} /></button></td>
-              </tr>
+                <React.Fragment key={guest.id}>
+                  <tr>
+                    <td><strong>{firstName} {restName.join(" ")}</strong><small>{guest.phone || "fara telefon"} - {guest.side}</small></td>
+                    <td><span className={`pill ${guest.status === "Confirmat" ? "yes" : guest.status === "Refuzat" ? "no" : ""}`}>{guest.status}</span></td>
+                    <td>{guest.seats} <small>{partyLabel(guest.seats)}</small></td>
+                    <td><small>{mealSummary(guest)}</small><small>{guest.allergies || ""}</small></td>
+                    <td>{guest.table_label || guest.table_name || "-"}</td>
+                    <td>
+                      {canEdit ? <div className="row-actions">
+                        <a className="tool-button whatsapp" href={guest.whatsappUrl} target="_blank" rel="noreferrer" onClick={() => mutate(`/api/guests/${guest.id}`, { method: "PATCH", body: JSON.stringify({ table_id: guest.table_id || "", invitation_sent: 1 }) })}><MessageCircle size={17} />WhatsApp</a>
+                        <button className="tool-button" onClick={() => copyLink(guest)} type="button">{copied === guest.id ? <Check size={17} /> : <Copy size={17} />}{copied === guest.id ? "Copiat" : "Link"}</button>
+                      </div> : <button className="tool-button" onClick={() => copyLink(guest)} type="button">{copied === guest.id ? <Check size={17} /> : <Copy size={17} />}{copied === guest.id ? "Copiat" : "Link"}</button>}
+                    </td>
+                    <td>
+                      {canEdit ? <div className="row-actions">
+                        <button className="icon-button" onClick={() => startEditGuest(guest)} title="Editeaza" type="button"><Pencil size={17} /></button>
+                        <button className="icon-button danger" onClick={() => askDelete(`/api/guests/${guest.id}`, `Stergi invitatul ${guest.name}?`)} title="Sterge" type="button"><Trash2 size={17} /></button>
+                      </div> : null}
+                    </td>
+                  </tr>
+                  {isEditing ? (
+                    <tr className="edit-row">
+                      <td colSpan="7">
+                        <form className="inline-edit-form" onSubmit={saveGuestEdit}>
+                          <input required placeholder="Nume" value={editGuest.first_name} onChange={(event) => setEditGuest({ ...editGuest, first_name: event.target.value })} />
+                          <input required placeholder="Prenume" value={editGuest.last_name} onChange={(event) => setEditGuest({ ...editGuest, last_name: event.target.value })} />
+                          <input placeholder="Telefon" value={editGuest.phone} onChange={(event) => setEditGuest({ ...editGuest, phone: event.target.value })} />
+                          <select value={editGuest.side} onChange={(event) => setEditGuest({ ...editGuest, side: event.target.value })}><option>Comun</option><option>Mireasa</option><option>Mire</option></select>
+                          <select value={editGuest.status} onChange={(event) => setEditGuest({ ...editGuest, status: event.target.value })}><option>In asteptare</option><option>Confirmat</option><option>Refuzat</option></select>
+                          <input type="number" min="1" max="10" value={editGuest.seats} onChange={(event) => setEditGuest({ ...editGuest, seats: event.target.value })} />
+                          <input placeholder="Meniu" value={editGuest.meal_choice} onChange={(event) => setEditGuest({ ...editGuest, meal_choice: event.target.value })} />
+                          <input placeholder="Alergii" value={editGuest.allergies} onChange={(event) => setEditGuest({ ...editGuest, allergies: event.target.value })} />
+                          <select value={editGuest.table_id} onChange={(event) => setEditGuest({ ...editGuest, table_id: event.target.value })}>
+                            <option value="">Fara masa</option>
+                            {data.tables.map((table) => <option value={table.id} key={table.id}>{table.name}</option>)}
+                          </select>
+                          <button type="submit"><Check size={17} />Salveaza</button>
+                          <button className="tool-button" onClick={() => setEditGuest(null)} type="button"><X size={17} />Anuleaza</button>
+                        </form>
+                      </td>
+                    </tr>
+                  ) : null}
+                </React.Fragment>
               );
             })}
           </tbody>
@@ -643,6 +782,7 @@ function Tables({ data, mutate, embedded = false }) {
   const [form, setForm] = useState({ name: "", capacity: 8, notes: "" });
   const [search, setSearch] = useState("");
   const { askDelete, dialog } = useConfirmDelete(mutate);
+  const canEdit = canRole(data.wedding.role, "planner");
   const unseated = data.guests.filter((guest) => guest.status === "Confirmat" && !guest.table_id);
   const tables = data.tables.filter((table) => table.name.toLowerCase().includes(search.toLowerCase()) || data.guests.some((guest) => guest.table_id === table.id && guest.name.toLowerCase().includes(search.toLowerCase())));
 
@@ -658,19 +798,19 @@ function Tables({ data, mutate, embedded = false }) {
 
   const content = (
     <>
-      <form className="entry-form table-form" onSubmit={createTable}>
+      {canEdit ? <form className="entry-form table-form" onSubmit={createTable}>
         <input required placeholder="Nume masa" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
         <input type="number" min="1" max="30" value={form.capacity} onChange={(event) => setForm({ ...form, capacity: event.target.value })} />
         <input placeholder="Observatii" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
         <button type="submit"><Plus size={18} />Adauga masa</button>
-      </form>
+      </form> : null}
       <div className="filter-bar"><label><Search size={16} />Cauta<input placeholder="Masa sau invitat" value={search} onChange={(event) => setSearch(event.target.value)} /></label></div>
       <div className="seating-layout">
         <aside className="panel">
           <h3>Invitati confirmati neasezati</h3>
           <div className="chip-list">
             {unseated.length ? unseated.map((guest) => (
-              <div className="guest-chip" draggable onDragStart={(event) => event.dataTransfer.setData("guestId", guest.id)} key={guest.id}>
+              <div className="guest-chip" draggable={canEdit} onDragStart={canEdit ? (event) => event.dataTransfer.setData("guestId", guest.id) : undefined} key={guest.id}>
                 <strong>{guest.name}</strong><small>{guest.seats} locuri</small>
                 {Number(guest.seats || 1) > 1 ? <span className="plus-badge">{partyLabel(guest.seats)}</span> : null}
               </div>
@@ -683,10 +823,10 @@ function Tables({ data, mutate, embedded = false }) {
             const seats = seated.reduce((sum, guest) => sum + Number(guest.seats || 0), 0);
             const over = seats > table.capacity;
             return (
-              <article className={`table-card ${over ? "over" : ""}`} key={table.id} onDragOver={(event) => event.preventDefault()} onDrop={(event) => assignGuest(event.dataTransfer.getData("guestId"), table.id)}>
+              <article className={`table-card ${over ? "over" : ""}`} key={table.id} onDragOver={canEdit ? (event) => event.preventDefault() : undefined} onDrop={canEdit ? (event) => assignGuest(event.dataTransfer.getData("guestId"), table.id) : undefined}>
                 <header>
                   <div className="table-title"><span className="table-icon" /><strong>{table.name}</strong><small>{seats}/{table.capacity} locuri</small></div>
-                  <button className="icon-button danger" onClick={() => askDelete(`/api/tables/${table.id}`, `Stergi masa ${table.name}? Invitatii de la aceasta masa vor ramane neasezati.`)} type="button"><Trash2 size={17} /></button>
+                  {canEdit ? <button className="icon-button danger" onClick={() => askDelete(`/api/tables/${table.id}`, `Stergi masa ${table.name}? Invitatii de la aceasta masa vor ramane neasezati.`)} type="button"><Trash2 size={17} /></button> : null}
                 </header>
                 {over ? <p className="capacity-warning">Capacitate depasita</p> : null}
                 <div className="chip-list">
@@ -694,7 +834,7 @@ function Tables({ data, mutate, embedded = false }) {
                     <div className="guest-chip" key={guest.id}>
                       <span className="guest-name">{guest.name}</span>
                       {Number(guest.seats || 1) > 1 ? <strong className="plus-badge">{partyLabel(guest.seats)}</strong> : <span />}
-                      <button onClick={() => assignGuest(guest.id, "")} type="button">Scoate</button>
+                      {canEdit ? <button onClick={() => assignGuest(guest.id, "")} type="button">Scoate</button> : <span />}
                     </div>
                   ))}
                 </div>
@@ -719,6 +859,7 @@ function Tables({ data, mutate, embedded = false }) {
 
 function RoomPlan({ data, mutate, embedded = false }) {
   const roomMap = Object.fromEntries((data.roomTables || []).map((item) => [item.table_id, item]));
+  const canEdit = canRole(data.wedding.role, "planner");
   async function move(tableId, event) {
     const table = data.tables.find((item) => item.id === tableId);
     if (!table) return;
@@ -738,8 +879,8 @@ function RoomPlan({ data, mutate, embedded = false }) {
       </div>
       <div
         className="room-plan"
-        onDragOver={(event) => event.preventDefault()}
-        onDrop={(event) => move(event.dataTransfer.getData("tableId"), event)}
+        onDragOver={canEdit ? (event) => event.preventDefault() : undefined}
+        onDrop={canEdit ? (event) => move(event.dataTransfer.getData("tableId"), event) : undefined}
       >
         {data.tables.map((table) => {
           const pos = roomMap[table.id] || { x: 20, y: 20, shape: "round" };
@@ -747,10 +888,10 @@ function RoomPlan({ data, mutate, embedded = false }) {
           return (
             <button
               className={`room-table ${pos.shape === "rect" ? "rect" : ""}`}
-              draggable
+              draggable={canEdit}
               key={table.id}
-              onDoubleClick={() => toggleShape(table)}
-              onDragStart={(event) => event.dataTransfer.setData("tableId", table.id)}
+              onDoubleClick={canEdit ? () => toggleShape(table) : undefined}
+              onDragStart={canEdit ? (event) => event.dataTransfer.setData("tableId", table.id) : undefined}
               style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
               title="Trage pentru pozitie. Dublu click schimba forma."
               type="button"
@@ -813,8 +954,10 @@ function Budget({ data, mutate }) {
 
 function Suppliers({ data, mutate }) {
   const [form, setForm] = useState({ name: "", category: "", phone: "", email: "", advance: "", total: "", due: "", notes: "", contract: null });
+  const [editSupplier, setEditSupplier] = useState(null);
   const [search, setSearch] = useState("");
   const { askDelete, dialog } = useConfirmDelete(mutate);
+  const canEdit = canRole(data.wedding.role, "planner");
   const rows = data.suppliers.filter((supplier) => [supplier.name, supplier.phone, supplier.email].join(" ").toLowerCase().includes(search.toLowerCase()));
   const planned = rows.reduce((sum, supplier) => sum + Number(supplier.total || 0), 0);
   const paid = rows.reduce((sum, supplier) => sum + Number(supplier.advance || 0), 0);
@@ -830,25 +973,94 @@ function Suppliers({ data, mutate }) {
     await mutate("/api/suppliers", { method: "POST", body: JSON.stringify(payload) });
     setForm({ name: "", category: "", phone: "", email: "", advance: "", total: "", due: "", notes: "", contract: null });
   }
+  function startEditSupplier(supplier) {
+    setEditSupplier({
+      id: supplier.id,
+      name: supplier.name || "",
+      phone: supplier.phone || "",
+      email: supplier.email || "",
+      advance: supplier.advance || "",
+      total: supplier.total || "",
+      notes: supplier.notes || "",
+      contract_name: supplier.contract_name || "",
+      contract: null
+    });
+  }
+  async function saveSupplier(event) {
+    event.preventDefault();
+    const payload = { ...editSupplier };
+    if (editSupplier.contract) {
+      payload.contract_name = editSupplier.contract.name;
+      payload.contract_data_url = await fileToDataUrl(editSupplier.contract);
+    }
+    delete payload.contract;
+    const ok = await mutate(`/api/suppliers/${editSupplier.id}`, { method: "PATCH", body: JSON.stringify(payload) });
+    if (ok) setEditSupplier(null);
+  }
   return (
     <section className="module">
-      <div className="module-title"><div><p className="eyebrow">Financiar</p><h2>Buget calculat din furnizori</h2></div></div>
+      <div className="module-title"><div><p className="eyebrow">Financiar</p><h2>Costuri</h2></div></div>
       <div className="finance-summary">
         <article><span>Total contracte</span><strong>{money(planned)}</strong></article>
         <article><span>Platit / avansuri</span><strong>{money(paid)}</strong></article>
         <article><span>De plata</span><strong>{money(remaining)}</strong></article>
       </div>
-      <form className="entry-form suppliers-form" onSubmit={submit}>
+      {canEdit ? <form className="entry-form suppliers-form" onSubmit={submit}>
         <input required placeholder="Furnizor" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
         <input placeholder="Telefon" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
         <input placeholder="Email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
         <input type="number" min="0" placeholder="Avans platit" value={form.advance} onChange={(event) => setForm({ ...form, advance: event.target.value })} />
         <input type="number" min="0" placeholder="Total contract" value={form.total} onChange={(event) => setForm({ ...form, total: event.target.value })} />
-        <input type="file" accept=".pdf,.doc,.docx,image/*" onChange={(event) => setForm({ ...form, contract: event.target.files?.[0] || null })} />
+        <label className="file-picker">
+          <input type="file" accept=".pdf,.doc,.docx,image/*" onChange={(event) => setForm({ ...form, contract: event.target.files?.[0] || null })} />
+          <span><FileText size={17} />{form.contract ? form.contract.name : "Alege contract"}</span>
+        </label>
         <button type="submit"><Plus size={18} />Adauga</button>
-      </form>
+      </form> : null}
       <div className="filter-bar"><label><Search size={16} />Cauta<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Furnizor sau contact" /></label></div>
-      <div className="table-wrap"><table><thead><tr><th>Furnizor</th><th>Contact</th><th>Avans platit</th><th>Total</th><th>De plata</th><th>Contract</th><th></th></tr></thead><tbody>{rows.map((supplier) => <tr key={supplier.id}><td><strong>{supplier.name}</strong></td><td>{supplier.phone || "-"}<small>{supplier.email || ""}</small></td><td>{money(supplier.advance)}</td><td>{money(supplier.total)}</td><td>{money(Math.max(0, Number(supplier.total || 0) - Number(supplier.advance || 0)))}</td><td>{supplier.contract_name || "-"}</td><td><button className="icon-button danger" onClick={() => askDelete(`/api/suppliers/${supplier.id}`, `Stergi furnizorul ${supplier.name}?`)} type="button"><Trash2 size={17} /></button></td></tr>)}</tbody></table></div>
+      <div className="table-wrap"><table><thead><tr><th>Furnizor</th><th>Contact</th><th>Avans platit</th><th>Total</th><th>De plata</th><th>Contract</th><th></th></tr></thead><tbody>{rows.map((supplier) => {
+        const isEditing = editSupplier?.id === supplier.id;
+        return (
+          <React.Fragment key={supplier.id}>
+            <tr>
+              <td><strong>{supplier.name}</strong></td>
+              <td>{supplier.phone || "-"}<small>{supplier.email || ""}</small></td>
+              <td>{money(supplier.advance)}</td>
+              <td>{money(supplier.total)}</td>
+              <td>{money(Math.max(0, Number(supplier.total || 0) - Number(supplier.advance || 0)))}</td>
+              <td>{supplier.contract_name || "-"}</td>
+              <td>
+                {canEdit ? (
+                <div className="row-actions">
+                  <button className="icon-button" onClick={() => startEditSupplier(supplier)} title="Editeaza" type="button"><Pencil size={17} /></button>
+                  <button className="icon-button danger" onClick={() => askDelete(`/api/suppliers/${supplier.id}`, `Stergi furnizorul ${supplier.name}?`)} type="button"><Trash2 size={17} /></button>
+                </div>
+                ) : null}
+              </td>
+            </tr>
+            {isEditing ? (
+              <tr className="edit-row">
+                <td colSpan="7">
+                  <form className="inline-edit-form supplier-edit-form" onSubmit={saveSupplier}>
+                    <input required placeholder="Furnizor" value={editSupplier.name} onChange={(event) => setEditSupplier({ ...editSupplier, name: event.target.value })} />
+                    <input placeholder="Telefon" value={editSupplier.phone} onChange={(event) => setEditSupplier({ ...editSupplier, phone: event.target.value })} />
+                    <input placeholder="Email" value={editSupplier.email} onChange={(event) => setEditSupplier({ ...editSupplier, email: event.target.value })} />
+                    <input type="number" min="0" placeholder="Avans platit" value={editSupplier.advance} onChange={(event) => setEditSupplier({ ...editSupplier, advance: event.target.value })} />
+                    <input type="number" min="0" placeholder="Total contract" value={editSupplier.total} onChange={(event) => setEditSupplier({ ...editSupplier, total: event.target.value })} />
+                    <input placeholder="Observatii" value={editSupplier.notes} onChange={(event) => setEditSupplier({ ...editSupplier, notes: event.target.value })} />
+                    <label className="file-picker">
+                      <input type="file" accept=".pdf,.doc,.docx,image/*" onChange={(event) => setEditSupplier({ ...editSupplier, contract: event.target.files?.[0] || null })} />
+                      <span><FileText size={17} />{editSupplier.contract ? editSupplier.contract.name : editSupplier.contract_name || "Schimba contract"}</span>
+                    </label>
+                    <button type="submit"><Check size={17} />Salveaza</button>
+                    <button className="tool-button" onClick={() => setEditSupplier(null)} type="button"><X size={17} />Anuleaza</button>
+                  </form>
+                </td>
+              </tr>
+            ) : null}
+          </React.Fragment>
+        );
+      })}</tbody></table></div>
       {dialog}
     </section>
   );
@@ -908,6 +1120,7 @@ function CalendarView({ data, mutate }) {
   const [filters, setFilters] = useState({ search: "", done: "all" });
   const [month, setMonth] = useState((data.wedding.wedding_date || new Date().toISOString().slice(0, 10)).slice(0, 7));
   const { askDelete, dialog } = useConfirmDelete(mutate);
+  const canEdit = canRole(data.wedding.role, "planner");
   const groups = ["Invitatii", "Restaurant", "Furnizori", "Acte", "Saptamana nuntii", "General"];
   const events = [
     ...(data.wedding.wedding_date ? [{ date: data.wedding.wedding_date, title: `Nunta ${data.wedding.couple}`, type: "Eveniment" }] : []),
@@ -946,14 +1159,14 @@ function CalendarView({ data, mutate }) {
   return (
     <section className="module">
       <div className="module-title"><div><p className="eyebrow">Calendar</p><h2>Calendar si checklist</h2></div></div>
-      <form className="entry-form task-form" onSubmit={submit}>
+      {canEdit ? <form className="entry-form task-form" onSubmit={submit}>
         <input required placeholder="Sarcina" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />
         <input type="date" value={form.due} onChange={(event) => setForm({ ...form, due: event.target.value })} />
         <select value={form.owner} onChange={(event) => setForm({ ...form, owner: event.target.value })}><option>Amandoi</option><option>Mireasa</option><option>Mire</option><option>Familie</option><option>Planner</option></select>
         <select value={form.stage} onChange={(event) => setForm({ ...form, stage: event.target.value })}>{groups.map((group) => <option key={group}>{group}</option>)}</select>
         <select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })}><option>Mica</option><option>Medie</option><option>Mare</option></select>
         <button type="submit"><Plus size={18} />Adauga</button>
-      </form>
+      </form> : null}
       <div className="calendar-toolbar">
         <button className="tool-button" onClick={() => shiftMonth(-1)} type="button">Luna trecuta</button>
         <strong>{monthDate.toLocaleDateString("ro-RO", { month: "long", year: "numeric" })}</strong>
@@ -975,9 +1188,9 @@ function CalendarView({ data, mutate }) {
       <div className="task-list">
         {tasks.map((task) => (
           <article className={`task-card ${task.done ? "done" : ""}`} key={task.id}>
-            <input checked={task.done} onChange={(event) => mutate(`/api/tasks/${task.id}`, { method: "PATCH", body: JSON.stringify({ done: event.target.checked }) })} type="checkbox" />
+            <input checked={task.done} disabled={!canEdit} onChange={(event) => mutate(`/api/tasks/${task.id}`, { method: "PATCH", body: JSON.stringify({ done: event.target.checked }) })} type="checkbox" />
             <div><strong>{task.title}</strong><small>{task.due || "fara termen"} - {task.owner} - {task.stage} - {task.priority}</small></div>
-            <button className="icon-button danger" onClick={() => askDelete(`/api/tasks/${task.id}`, `Stergi sarcina ${task.title}?`)} type="button"><Trash2 size={17} /></button>
+            {canEdit ? <button className="icon-button danger" onClick={() => askDelete(`/api/tasks/${task.id}`, `Stergi sarcina ${task.title}?`)} type="button"><Trash2 size={17} /></button> : null}
           </article>
         ))}
       </div>
@@ -1010,12 +1223,12 @@ function MediaQr({ data }) {
     QRCode.toDataURL(data.mediaUrl, { width: 900, margin: 2 }).then(setQr);
   }, [data.mediaUrl]);
   return (
-    <section className="module media-layout">
-      <div>
+    <section className="module media-layout qr-media-section">
+      <div className="qr-media-intro">
         <p className="eyebrow">Poze si video</p>
         <h2>Cod QR pentru upload de la invitati</h2>
         <p className="hint">Linkul public duce la pagina unde invitatii pot incarca poze si video-uri dupa eveniment.</p>
-        <div className="row-actions">
+        <div className="row-actions qr-actions">
           <a className="tool-button" href={data.mediaUrl} target="_blank" rel="noreferrer"><ImageUp size={17} />Deschide pagina</a>
           <button className="tool-button" onClick={() => navigator.clipboard.writeText(data.mediaUrl)} type="button"><Copy size={17} />Copiaza link</button>
           {qr ? <a className="tool-button whatsapp" href={qr} download="qr-upload-poze.png"><Download size={17} />Descarca QR</a> : null}
@@ -1087,54 +1300,94 @@ function Photos({ data }) {
 }
 
 function Team({ data, mutate }) {
-  const [form, setForm] = useState({ name: "", email: "", role: "viewer" });
+  const [form, setForm] = useState({ first_name: "", last_name: "", phone: "", email: "", password: "", role: "planner" });
+  const [editMember, setEditMember] = useState(null);
   async function submit(event) {
     event.preventDefault();
     await mutate("/api/team", { method: "POST", body: JSON.stringify(form) });
-    setForm({ name: "", email: "", role: "viewer" });
+    setForm({ first_name: "", last_name: "", phone: "", email: "", password: "", role: "planner" });
+  }
+  function startEditMember(member) {
+    const parts = splitGuestName(member.name);
+    setEditMember({
+      id: member.id,
+      first_name: member.first_name || parts.first_name,
+      last_name: member.last_name || parts.last_name,
+      phone: member.phone || "",
+      email: member.email || "",
+      role: member.role || "viewer",
+      password: ""
+    });
+  }
+  async function saveMember(event) {
+    event.preventDefault();
+    const ok = await mutate(`/api/team/${editMember.id}`, { method: "PATCH", body: JSON.stringify(editMember) });
+    if (ok) setEditMember(null);
   }
   return (
-    <section className="module settings-layout">
-      <div><p className="eyebrow">Roluri</p><h2>Acces pentru clienti si colaboratori</h2><p className="hint">Conturile noi create aici primesc parola initiala `parola123`.</p></div>
-      <div>
-        <form className="settings-form" onSubmit={submit}>
-          <label>Nume<input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
-          <label>Email<input required type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label>
-          <label>Rol<select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })}><option value="owner">Miri / owner</option><option value="planner">Wedding planner</option><option value="viewer">Vizualizare</option></select></label>
-          <button type="submit">Adauga acces</button>
-        </form>
-        <div className="team-list">{data.team.map((member) => <article key={member.id}><strong>{member.name}</strong><small>{member.email} - {member.role}</small></article>)}</div>
+    <section className="module team-page">
+      <div className="settings-header">
+        <p className="eyebrow">Roluri</p>
+        <h2>Acces pentru colaboratori</h2>
+        <p className="hint">Creezi conturi de planner sau vizualizare. Emailul trebuie sa fie unic in platforma.</p>
       </div>
+      <div className="team-grid">
+        <form className="settings-form team-form-card" onSubmit={submit}>
+          <label>Nume<input value={form.first_name} onChange={(event) => setForm({ ...form, first_name: event.target.value })} /></label>
+          <label>Prenume<input value={form.last_name} onChange={(event) => setForm({ ...form, last_name: event.target.value })} /></label>
+          <label>Telefon<input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></label>
+          <label>Email<input required type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label>
+          <label>Parola<input required minLength="6" type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} /></label>
+          <label>Rol<select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })}><option value="planner">Planner</option><option value="viewer">Vizualizare</option></select></label>
+          <button className="settings-save" type="submit"><UserPlus size={18} />Creeaza cont</button>
+        </form>
+        <div className="team-list">
+          {data.team.map((member) => (
+            <article key={member.id}>
+              <div>
+                <strong>{member.name}</strong>
+                <small>{member.email}{member.phone ? ` - ${member.phone}` : ""}</small>
+              </div>
+              <div className="row-actions">
+                <span className="pill">{member.role === "owner" ? "Miri" : member.role === "planner" ? "Planner" : "Vizualizare"}</span>
+                {member.role !== "owner" ? <button className="icon-button" onClick={() => startEditMember(member)} title="Editeaza cont" type="button"><Pencil size={17} /></button> : null}
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+      {editMember ? (
+        <div className="confirm-backdrop" role="dialog" aria-modal="true">
+          <section className="confirm-dialog edit-dialog">
+            <button className="modal-close" onClick={() => setEditMember(null)} type="button"><X size={18} /></button>
+            <h2>Editeaza cont</h2>
+            <form className="inline-edit-form team-edit-form" onSubmit={saveMember}>
+              <label>Nume<input value={editMember.first_name} onChange={(event) => setEditMember({ ...editMember, first_name: event.target.value })} /></label>
+              <label>Prenume<input value={editMember.last_name} onChange={(event) => setEditMember({ ...editMember, last_name: event.target.value })} /></label>
+              <label>Telefon<input value={editMember.phone} onChange={(event) => setEditMember({ ...editMember, phone: event.target.value })} /></label>
+              <label>Email<input required type="email" value={editMember.email} onChange={(event) => setEditMember({ ...editMember, email: event.target.value })} /></label>
+              <label>Rol<select value={editMember.role} onChange={(event) => setEditMember({ ...editMember, role: event.target.value })}><option value="planner">Planner</option><option value="viewer">Vizualizare</option></select></label>
+              <label>Parola noua<input minLength="6" placeholder="Lasa gol daca nu schimbi" type="password" value={editMember.password} onChange={(event) => setEditMember({ ...editMember, password: event.target.value })} /></label>
+              <button type="submit"><Check size={17} />Salveaza</button>
+              <button className="tool-button" onClick={() => setEditMember(null)} type="button"><X size={17} />Anuleaza</button>
+            </form>
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 }
 
-function SettingsPanel({ data, mutate }) {
+function InvitationSettings({ data, mutate }) {
   const [form, setForm] = useState(data.wedding);
-  const [uploadingHero, setUploadingHero] = useState(false);
-  const [uploadingProfile, setUploadingProfile] = useState(false);
+  const [uploadingHero, setUploadingHero] = useState("");
   const [saved, setSaved] = useState(false);
   const [menuDraft, setMenuDraft] = useState("");
   useEffect(() => setForm(data.wedding), [data.wedding]);
   const program = Array.isArray(form.program) ? form.program : [];
   const menuOptions = Array.isArray(form.menu_options) ? form.menu_options : [];
-  const platformThemes = [
-    { key: "sage", label: "Salvie", colors: ["#668a70", "#b98b42", "#ffffff"] },
-    { key: "rose", label: "Rose", colors: ["#b76e79", "#7d3042", "#fff7f7"] },
-    { key: "navy", label: "Navy", colors: ["#17324d", "#c6a15b", "#ffffff"] },
-    { key: "dark", label: "Dark", colors: ["#13201c", "#d1b76f", "#f5f2ea"] }
-  ];
-  useEffect(() => {
-    const shell = document.querySelector(".app-shell");
-    if (!shell) return undefined;
-    const original = data.wedding.theme_color || "sage";
-    shell.classList.remove("theme-sage", "theme-rose", "theme-navy", "theme-dark");
-    shell.classList.add(`theme-${form.theme_color || "sage"}`);
-    return () => {
-      shell.classList.remove("theme-sage", "theme-rose", "theme-navy", "theme-dark");
-      shell.classList.add(`theme-${original}`);
-    };
-  }, [form.theme_color, data.wedding.theme_color]);
+  const currentTemplate = invitationTemplates.find((template) => template.key === (form.invitation_template || "custom")) || invitationTemplates[0];
+  const previewUrl = data.guests[0]?.inviteUrl || data.wedding.publicInviteUrl || "";
   function setProgram(index, key, value) {
     setSaved(false);
     setForm({ ...form, program: program.map((item, itemIndex) => itemIndex === index ? { ...item, [key]: value } : item) });
@@ -1160,26 +1413,38 @@ function SettingsPanel({ data, mutate }) {
   function removeMenuOption(option) {
     updateForm({ ...form, menu_options: menuOptions.filter((item) => item !== option) });
   }
-  async function uploadHero(event) {
+  async function uploadHero(event, slot = "hero") {
     const file = event.target.files?.[0];
     if (!file) return;
-    setUploadingHero(true);
+    setUploadingHero(slot);
     const dataUrl = await fileToDataUrl(file);
-    await mutate("/api/hero-upload", { method: "POST", body: JSON.stringify({ dataUrl, name: file.name }) });
-    setUploadingHero(false);
-  }
-  async function uploadProfile(event) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setUploadingProfile(true);
-    const dataUrl = await fileToDataUrl(file);
-    await mutate("/api/profile-upload", { method: "POST", body: JSON.stringify({ dataUrl, name: file.name }) });
-    setUploadingProfile(false);
+    await mutate("/api/hero-upload", { method: "POST", body: JSON.stringify({ dataUrl, name: file.name, slot: slot === "secondary" ? "secondary" : "hero" }) });
+    setUploadingHero("");
   }
   return (
     <section className="module settings-page">
-      <div className="settings-header"><p className="eyebrow">Setari</p><h2>Configurare nunta si invitatie</h2></div>
+      <div className="settings-header"><p className="eyebrow">Invitatie</p><h2>Pagina publica si RSVP</h2></div>
       <form className="settings-form settings-card" onSubmit={submit}>
+        <fieldset>
+          <legend>Invitatie - Template pagina</legend>
+          <div className="template-picker">
+            {invitationTemplates.map((template) => (
+              <button className={form.invitation_template === template.key || (!form.invitation_template && template.key === "custom") ? "selected" : ""} key={template.key} onClick={() => updateForm({ ...form, invitation_template: template.key })} type="button">
+                <img src={template.icon} alt="" />
+                <span><strong>{template.title}</strong><small>{template.description}</small></span>
+              </button>
+            ))}
+          </div>
+          {previewUrl ? (
+            <div className="invite-preview-box">
+              <div>
+                <strong>Previzualizare invitatie</strong>
+                <small>Se deschide cu datele si imaginile salvate pentru primul invitat din lista.</small>
+              </div>
+              <a className="tool-button" href={previewUrl} target="_blank" rel="noreferrer"><Eye size={17} />Previzualizeaza</a>
+            </div>
+          ) : <p className="hint">Adauga cel putin un invitat ca sa poti previzualiza pagina publica.</p>}
+        </fieldset>
         <fieldset>
           <legend>Invitatie - Detalii eveniment</legend>
           <div className="settings-grid two">
@@ -1190,37 +1455,28 @@ function SettingsPanel({ data, mutate }) {
             <label>Adresa<input value={form.venue_address || ""} onChange={(event) => updateForm({ ...form, venue_address: event.target.value })} /></label>
             <label>Link Google Maps<input value={form.map_url || ""} onChange={(event) => updateForm({ ...form, map_url: event.target.value })} /></label>
             <label>Dress code<input value={form.dress_code || ""} onChange={(event) => updateForm({ ...form, dress_code: event.target.value })} /></label>
-            <label>Imagine invitatie URL ({inviteImageResolution})<input value={form.hero_image_url || ""} onChange={(event) => updateForm({ ...form, hero_image_url: event.target.value })} /></label>
-          </div>
-        </fieldset>
-
-        <fieldset>
-          <legend>Platforma - Design intern</legend>
-          <div className="settings-choice-block">
-            <span>Tema platforma</span>
-            <div className="theme-dots">
-              {platformThemes.map((theme) => (
-                <button className={form.theme_color === theme.key ? "selected" : ""} key={theme.key} onClick={() => updateForm({ ...form, theme_color: theme.key })} type="button">
-                  <span className="dot-stack">{theme.colors.map((color) => <i key={color} style={{ background: color }} />)}</span>
-                  <strong>{theme.label}</strong>
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className={`platform-preview theme-${form.theme_color || "sage"}`}>
-            <aside><span /> <strong>{form.couple || "Mireasa & Mire"}</strong></aside>
-            <main><b>Preview platforma</b><small>Carduri, meniuri si formulare</small></main>
+            <label>Media sus in pagina URL ({currentTemplate.resolution})<input value={form.hero_image_url || ""} onChange={(event) => updateForm({ ...form, hero_image_url: event.target.value })} /></label>
+            <label>Media jos in pagina URL ({currentTemplate.secondaryResolution})<input value={form.invite_secondary_image_url || ""} onChange={(event) => updateForm({ ...form, invite_secondary_image_url: event.target.value })} /></label>
           </div>
         </fieldset>
 
         <fieldset>
           <legend>Invitatie - Imagini</legend>
-          <div className="settings-grid two">
-            <label>Incarca imagine invitatie ({inviteImageResolution})<input type="file" accept="image/*" onChange={uploadHero} /></label>
-            <label>Poza de profil cu mirii<input type="file" accept="image/*" onChange={uploadProfile} /></label>
+          <div className="settings-grid">
+            <label className="file-field">Media sus in pagina ({currentTemplate.resolution})
+              <span className="file-picker">
+                <input type="file" accept="image/*,video/*" onChange={(event) => uploadHero(event, "hero")} />
+                <span><ImageUp size={17} />Incarca poza sau video sus</span>
+              </span>
+            </label>
+            <label className="file-field">Media jos in pagina ({currentTemplate.secondaryResolution})
+              <span className="file-picker">
+                <input type="file" accept="image/*,video/*" onChange={(event) => uploadHero(event, "secondary")} />
+                <span><ImageUp size={17} />Incarca poza sau video jos</span>
+              </span>
+            </label>
           </div>
-          {uploadingHero ? <p className="hint">Se incarca imaginea hero...</p> : null}
-          {uploadingProfile ? <p className="hint">Se incarca poza de profil...</p> : null}
+          {uploadingHero ? <p className="hint">Se incarca {uploadingHero === "secondary" ? "media de jos" : "media de sus"}...</p> : null}
         </fieldset>
 
         <fieldset>
@@ -1264,9 +1520,94 @@ function SettingsPanel({ data, mutate }) {
   );
 }
 
+function SettingsPanel({ data, mutate }) {
+  const [form, setForm] = useState(data.wedding);
+  const [uploadingProfile, setUploadingProfile] = useState(false);
+  const [saved, setSaved] = useState(false);
+  useEffect(() => setForm(data.wedding), [data.wedding]);
+  const platformThemes = [
+    { key: "sage", label: "Salvie", colors: ["#668a70", "#b98b42", "#ffffff"] },
+    { key: "rose", label: "Rose", colors: ["#b76e79", "#7d3042", "#fff7f7"] },
+    { key: "navy", label: "Navy", colors: ["#17324d", "#c6a15b", "#ffffff"] },
+    { key: "dark", label: "Dark", colors: ["#13201c", "#d1b76f", "#f5f2ea"] }
+  ];
+  useEffect(() => {
+    const shell = document.querySelector(".app-shell");
+    if (!shell) return undefined;
+    const original = data.wedding.theme_color || "sage";
+    shell.classList.remove("theme-sage", "theme-rose", "theme-navy", "theme-dark");
+    shell.classList.add(`theme-${form.theme_color || "sage"}`);
+    return () => {
+      shell.classList.remove("theme-sage", "theme-rose", "theme-navy", "theme-dark");
+      shell.classList.add(`theme-${original}`);
+    };
+  }, [form.theme_color, data.wedding.theme_color]);
+  function updateForm(next) {
+    setSaved(false);
+    setForm(next);
+  }
+  async function submit(event) {
+    event.preventDefault();
+    const ok = await mutate("/api/settings", { method: "PUT", body: JSON.stringify(form) });
+    if (ok) {
+      setSaved(true);
+      window.setTimeout(() => setSaved(false), 2500);
+    }
+  }
+  async function uploadProfile(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setUploadingProfile(true);
+    const dataUrl = await fileToDataUrl(file);
+    await mutate("/api/profile-upload", { method: "POST", body: JSON.stringify({ dataUrl, name: file.name }) });
+    setUploadingProfile(false);
+  }
+  return (
+    <section className="module settings-page">
+      <div className="settings-header"><p className="eyebrow">Setari</p><h2>Design platforma si profil</h2></div>
+      <form className="settings-form settings-card" onSubmit={submit}>
+        <fieldset>
+          <legend>Platforma - Design intern</legend>
+          <div className="settings-choice-block">
+            <span>Tema platforma</span>
+            <div className="theme-dots">
+              {platformThemes.map((theme) => (
+                <button className={form.theme_color === theme.key ? "selected" : ""} key={theme.key} onClick={() => updateForm({ ...form, theme_color: theme.key })} type="button">
+                  <span className="dot-stack">{theme.colors.map((color) => <i key={color} style={{ background: color }} />)}</span>
+                  <strong>{theme.label}</strong>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className={`platform-preview theme-${form.theme_color || "sage"}`}>
+            <aside><span /> <strong>{form.couple || "Mireasa & Mire"}</strong></aside>
+            <main><b>Preview platforma</b><small>Carduri, meniuri si formulare</small></main>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Profil</legend>
+          <div className="settings-grid two">
+            <label>Mireasa & Mire<input value={form.couple || ""} onChange={(event) => updateForm({ ...form, couple: event.target.value })} /></label>
+            <label>Locatie<input value={form.venue || ""} onChange={(event) => updateForm({ ...form, venue: event.target.value })} /></label>
+            <label className="file-field">Poza de profil cu mirii
+              <span className="file-picker">
+                <input type="file" accept="image/*" onChange={uploadProfile} />
+                <span><ImageUp size={17} />Incarca poza de profil</span>
+              </span>
+            </label>
+          </div>
+          {uploadingProfile ? <p className="hint">Se incarca poza de profil...</p> : null}
+        </fieldset>
+        {saved ? <p className="save-notice"><Check size={18} />Setarile au fost salvate.</p> : null}
+        <button className="settings-save" type="submit">Salveaza setarile</button>
+      </form>
+    </section>
+  );
+}
+
 function InvitationPage({ token }) {
   const [data, setData] = useState(null);
-  const [form, setForm] = useState({ status: "Confirmat", seats: 1, meal_choice: "", allergies: "", guest_message: "" });
+  const [form, setForm] = useState({ status: "Confirmat", seats: 1, meal_choice: "", meal_choices: [""], allergies: "", guest_message: "" });
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
 
@@ -1274,9 +1615,10 @@ function InvitationPage({ token }) {
     api(`/api/invite/${token}`).then((payload) => {
       setData(payload);
       setForm({
-        status: payload.guest.status || "Confirmat",
+        status: payload.guest.status === "In asteptare" ? "Confirmat" : payload.guest.status || "Confirmat",
         seats: payload.guest.seats || 1,
         meal_choice: payload.guest.meal_choice || "",
+        meal_choices: mealChoicesForSeats(payload.guest.meal_choices, payload.guest.seats || 1, payload.guest.meal_choice || ""),
         allergies: payload.guest.allergies || "",
         guest_message: payload.guest.guest_message || ""
       });
@@ -1287,9 +1629,33 @@ function InvitationPage({ token }) {
   if (!data) return <ScreenLoader />;
 
   const wedding = data.wedding;
-  const locked = saved || data.guest.response_locked || data.guest.status !== "In asteptare";
+  const locked = saved || data.guest.status !== "In asteptare";
   const menuOptions = Array.isArray(wedding.menu_options) && wedding.menu_options.length ? wedding.menu_options : ["Carne", "Peste", "Vegetarian", "Copil"];
-  const heroStyle = { backgroundImage: `linear-gradient(rgba(36,45,48,.38), rgba(36,45,48,.12)), url(${wedding.hero_image_url || "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1800&q=80"})` };
+  const seatCount = normalizeSeatCount(form.seats);
+  function updateSeats(value) {
+    const seats = normalizeSeatCount(value);
+    setForm({ ...form, seats, meal_choices: mealChoicesForSeats(form.meal_choices, seats, form.meal_choice) });
+  }
+  function updateMealChoice(index, value) {
+    const mealChoices = mealChoicesForSeats(form.meal_choices, seatCount, form.meal_choice);
+    mealChoices[index] = value;
+    setForm({ ...form, meal_choice: mealChoices.find(Boolean) || "", meal_choices: mealChoices });
+  }
+  const mealChoiceFields = (
+    <div className="meal-choice-group">
+      <span>Meniu pentru fiecare persoana</span>
+      {mealChoicesForSeats(form.meal_choices, seatCount, form.meal_choice).map((choice, index) => (
+        <label key={index}>Persoana {index + 1}
+          <select value={choice} onChange={(event) => updateMealChoice(index, event.target.value)}>
+            <option value="">Alege meniu</option>
+            {menuOptions.map((item) => <option key={item}>{item}</option>)}
+          </select>
+        </label>
+      ))}
+    </div>
+  );
+  const primaryMediaUrl = wedding.hero_image_url || "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1800&q=80";
+  const heroStyle = isVideoUrl(primaryMediaUrl) ? {} : { backgroundImage: `linear-gradient(rgba(36,45,48,.38), rgba(36,45,48,.12)), url(${primaryMediaUrl})` };
   const details = (
     <div className="invite-facts">
       <span><CalendarDays size={18} />{dateLabel(wedding.wedding_date)}{wedding.wedding_time ? `, ora ${wedding.wedding_time}` : ""}</span>
@@ -1302,39 +1668,100 @@ function InvitationPage({ token }) {
   const rsvpBlock = locked ? <div className="success-box"><Check size={22} />Raspunsul tau a fost salvat. Multumim! Nu mai poate fi modificat din acest link.</div> : (
     <form className="rsvp-form" onSubmit={async (event) => { event.preventDefault(); await api(`/api/invite/${token}`, { method: "POST", body: JSON.stringify(form) }); setSaved(true); }}>
       <label>Raspuns<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}><option>Confirmat</option><option>Refuzat</option><option>In asteptare</option></select></label>
-      <label>Numar persoane<input type="number" min="1" max="10" value={form.seats} onChange={(event) => setForm({ ...form, seats: event.target.value })} /></label>
-      <label>Meniu<select value={form.meal_choice} onChange={(event) => setForm({ ...form, meal_choice: event.target.value })}><option value="">Alege meniu</option>{menuOptions.map((item) => <option key={item}>{item}</option>)}</select></label>
+      <label>Numar persoane<input type="number" min="1" max="10" value={form.seats} onChange={(event) => updateSeats(event.target.value)} /></label>
+      {mealChoiceFields}
       <label>Alergii / restrictii<textarea value={form.allergies} onChange={(event) => setForm({ ...form, allergies: event.target.value })} /></label>
       <label>Mesaj pentru miri<textarea value={form.guest_message} onChange={(event) => setForm({ ...form, guest_message: event.target.value })} /></label>
       <button type="submit">Trimite raspunsul</button>
     </form>
   );
 
+  return <TemplateOneInvitation data={data} details={details} form={form} heroStyle={heroStyle} locked={locked} mealChoiceFields={mealChoiceFields} menuOptions={menuOptions} primaryMediaUrl={primaryMediaUrl} programBlock={programBlock} rsvpBlock={rsvpBlock} setForm={setForm} token={token} updateSeats={updateSeats} />;
+}
+
+function TemplateOneInvitation({ data, details, form, heroStyle, locked, mealChoiceFields, primaryMediaUrl, programBlock, rsvpBlock, setForm, token, updateSeats }) {
+  const wedding = data.wedding;
+  const primaryIsVideo = isVideoUrl(primaryMediaUrl);
+  const secondaryMediaUrl = wedding.invite_secondary_image_url || wedding.hero_image_url || "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&w=1400&q=80";
+  const secondaryIsVideo = isVideoUrl(secondaryMediaUrl);
+  const bottomStyle = secondaryIsVideo ? { background: "#1f2524" } : { backgroundImage: `linear-gradient(rgba(36,45,48,.58), rgba(36,45,48,.44)), url(${secondaryMediaUrl})` };
+  const eventDate = weddingDateTime(wedding);
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const diff = eventDate ? Math.max(0, eventDate.getTime() - now) : 0;
+  const days = Math.floor(diff / 86400000);
+  const hours = Math.floor((diff % 86400000) / 3600000);
+  const minutes = Math.floor((diff % 3600000) / 60000);
+  const seconds = Math.floor((diff % 60000) / 1000);
+  const mapUrl = wedding.map_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(wedding.venue || "")}`;
   return (
-    <main className="public-page custom-invite-page">
-      <section className="custom-invite-hero" style={heroStyle}>
-        <div>
-          <p>Invitatie de nunta</p>
+    <main className="tpl1-page">
+      <section className="tpl1-hero" style={heroStyle}>
+        {primaryIsVideo ? <video className="tpl1-hero-media" src={primaryMediaUrl} autoPlay muted loop playsInline /> : null}
+        <div className="tpl1-hero-content">
+          <p className="tpl1-topline">Save the date</p>
           <h1>{wedding.couple}</h1>
-          <span>{dateLabel(wedding.wedding_date)}{wedding.wedding_time ? `, ora ${wedding.wedding_time}` : ""}</span>
+          <p className="tpl1-meta">{dateLabel(wedding.wedding_date)}{wedding.wedding_time ? ` - ${wedding.wedding_time}` : ""}</p>
+          <div className="tpl1-countdown">
+            <div><span>{String(days).padStart(2, "0")}</span><small>Zile</small></div>
+            <div><span>{String(hours).padStart(2, "0")}</span><small>Ore</small></div>
+            <div><span>{String(minutes).padStart(2, "0")}</span><small>Min</small></div>
+            <div><span>{String(seconds).padStart(2, "0")}</span><small>Sec</small></div>
+          </div>
+        </div>
+        <a className="tpl1-scroll" href="#details"><span />Scroll</a>
+      </section>
+
+      <section className="tpl1-section" id="details">
+        <div className="tpl1-title"><span>Invitatie</span><h2>{wedding.venue || "Ziua noastra speciala"}</h2></div>
+        <article className="tpl1-card tpl1-invite-card">
+          <p className="eyebrow">Pentru {data.guest.name}</p>
+          <p>{wedding.invite_intro}</p>
+          {details}
+          <a className="tpl1-map" href={mapUrl} target="_blank" rel="noreferrer">Vezi locatia pe Google Maps</a>
+        </article>
+      </section>
+
+      <div className="tpl1-divider"><img src={templateOneIcon} alt="" /></div>
+
+      <section className="tpl1-section tpl1-section-alt">
+        <div className="tpl1-title"><span>Dress code & tematica</span><h2>{wedding.dress_code || "Elegant"}</h2></div>
+        <div className="tpl1-dress-grid">
+          <article className="tpl1-card">
+            <h3>Dress code</h3>
+            <p>{wedding.dress_code || "Tinuta eleganta, potrivita pentru seara."}</p>
+          </article>
+          <article className="tpl1-card">
+            <h3>Programul zilei</h3>
+            {programBlock}
+          </article>
         </div>
       </section>
-      <section className="custom-invite-content">
-        <article className="custom-invite-card">
-          <p className="eyebrow">Pentru {data.guest.name}</p>
-          <h2>Te asteptam cu drag</h2>
-          <p className="invite-copy">{wedding.invite_intro}</p>
-          {details}
-        </article>
-        <article className="custom-invite-card">
-          <h2>Program</h2>
-          {programBlock}
-        </article>
-        <article className="custom-invite-card rsvp-slot">
-          <h2>Confirmare participare</h2>
-          {rsvpBlock}
-        </article>
+
+      <section className="tpl1-rsvp" id="rsvp" style={bottomStyle}>
+        {secondaryIsVideo ? <video className="tpl1-rsvp-media" src={secondaryMediaUrl} autoPlay muted loop playsInline /> : null}
+        <div className="tpl1-rsvp-overlay" />
+        <div className="tpl1-rsvp-inner">
+          <div className="tpl1-title light"><span>Your response</span><h2>Confirma prezenta</h2></div>
+          <article className="tpl1-rsvp-box">
+            {locked ? rsvpBlock : (
+              <form className="rsvp-form" onSubmit={async (event) => { event.preventDefault(); await api(`/api/invite/${token}`, { method: "POST", body: JSON.stringify(form) }); window.location.reload(); }}>
+                <label>Raspuns<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}><option>Confirmat</option><option>Refuzat</option></select></label>
+                <label>Numar persoane<input type="number" min="1" max="10" value={form.seats} onChange={(event) => updateSeats(event.target.value)} /></label>
+                {mealChoiceFields}
+                <label>Alergii / restrictii<textarea value={form.allergies} onChange={(event) => setForm({ ...form, allergies: event.target.value })} /></label>
+                <label>Mesaj pentru miri<textarea value={form.guest_message} onChange={(event) => setForm({ ...form, guest_message: event.target.value })} /></label>
+                <button type="submit">Trimite raspunsul</button>
+              </form>
+            )}
+          </article>
+        </div>
       </section>
+
+      <footer className="tpl1-footer">Cu drag, {wedding.couple} {wedding.wedding_date ? `- ${dateLabel(wedding.wedding_date)}` : ""}</footer>
     </main>
   );
 }
@@ -1369,17 +1796,23 @@ function MediaUploadPage({ token }) {
   if (!data) return <ScreenLoader />;
 
   return (
-    <main className="media-public">
-      <section className="invite-card">
+    <main className={`media-public theme-${data.wedding.theme_color || "sage"}`}>
+      <section className="media-upload-card">
+        <div className="media-upload-icon"><Camera size={28} /></div>
         <p className="eyebrow">Albumul nuntii</p>
         <h1>{data.wedding.couple}</h1>
         <p className="invite-copy">Incarca aici pozele si video-urile tale de la eveniment.</p>
         {saved ? <div className="success-box"><Check size={22} />Fisierele au fost incarcate. Multumim!</div> : (
           <form className="rsvp-form" onSubmit={submit}>
             <label>Numele tau<input value={guestName} onChange={(event) => setGuestName(event.target.value)} /></label>
-            <label>Poze / video<input multiple accept="image/*,video/*" type="file" onChange={(event) => setFiles(event.target.files)} /></label>
+            <label className="file-field">Poze / video
+              <span className="file-picker upload-picker">
+                <input multiple accept="image/*,video/*" type="file" onChange={(event) => setFiles(event.target.files)} />
+                <span><ImageUp size={18} />{prettyFileLabel(files, "Alege poze sau video-uri")}</span>
+              </span>
+            </label>
             {error ? <p className="form-error">{error}</p> : null}
-            <button type="submit">Incarca fisiere</button>
+            <button type="submit"><ImageUp size={18} />Incarca fisiere</button>
           </form>
         )}
       </section>

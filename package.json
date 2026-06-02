@@ -9,7 +9,7 @@
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
     "check": "node --check server/index.js && vite build",
-    "start": "node server/index.js"
+    "start": "node --experimental-sqlite server/index.js"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.0.4",
