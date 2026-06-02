@@ -1196,6 +1196,6 @@ createServer(async (req, res) => {
   } catch (error) {
     send(res, 500, { message: error.message || "Eroare server." });
   }
-}).listen(port, "127.0.0.1", () => {
-  console.log(`API disponibil la http://127.0.0.1:${port}`);
+}).listen(port, "0.0.0.0", () => {
+  console.log(`API disponibil pe portul ${port}`);
 });
