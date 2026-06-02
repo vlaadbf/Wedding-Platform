@@ -200,6 +200,31 @@ function ConfirmDialog({ title = "Esti sigur?", message, confirmLabel = "Sterge"
   );
 }
 
+function AuthMotion({ type, message }) {
+  const isSuccess = type === "success";
+  const isRegister = type === "register";
+  return (
+    <div className={`auth-motion ${isSuccess ? "success" : isRegister ? "register" : "login"}`} role="status" aria-live="polite">
+      <div className="auth-orbit" aria-hidden="true">
+        <i />
+        <i />
+        <span>{isSuccess ? <Check size={30} /> : isRegister ? <UserPlus size={28} /> : <ShieldCheck size={30} />}</span>
+      </div>
+      <div>
+        <strong>{message}</strong>
+        <p>
+          {isSuccess
+            ? "Contul a fost creat. Revenim automat la conectare."
+            : isRegister
+              ? "Validam datele, cream nunta si pregatim contul."
+              : "Verificam sesiunea si pregatim panoul tau."}
+        </p>
+      </div>
+      <div className="auth-progress" aria-hidden="true"><span /></div>
+    </div>
+  );
+}
+
 function useConfirmDelete(mutate) {
   const [pending, setPending] = useState(null);
   const dialog = pending ? (
@@ -272,8 +297,8 @@ function AuthScreen({ onAuth }) {
           <button className={mode === "login" ? "active" : ""} onClick={() => { setMode("login"); setError(""); setSuccessMessage(""); }} type="button">Login</button>
           <button className={mode === "register" ? "active" : ""} onClick={() => { setMode("register"); setError(""); setSuccessMessage(""); }} type="button">Cont nou</button>
         </div>
-        {loadingMessage ? <div className="auth-status"><span /> <strong>{loadingMessage}</strong></div> : null}
-        {successMessage ? <div className="auth-success"><Check size={20} />{successMessage}</div> : null}
+        {loadingMessage ? <AuthMotion type={mode} message={loadingMessage} /> : null}
+        {successMessage ? <AuthMotion type="success" message={successMessage} /> : null}
         {mode === "login" ? (
           <form className="login-form" onSubmit={submitLogin}>
             <label>Email<input value={login.email} onChange={(event) => setLogin({ ...login, email: event.target.value })} /></label>
@@ -285,7 +310,7 @@ function AuthScreen({ onAuth }) {
           <form className="login-form register-grid" onSubmit={submitRegister}>
             <label>Nume cont<input required value={register.name} onChange={(event) => setRegister({ ...register, name: event.target.value })} /></label>
             <label>Email<input required type="email" value={register.email} onChange={(event) => setRegister({ ...register, email: event.target.value })} /></label>
-            <label>Parola<input required type="password" minLength="6" value={register.password} onChange={(event) => setRegister({ ...register, password: event.target.value })} /></label>
+            <label>Parola<input required type="password" minLength="10" value={register.password} onChange={(event) => setRegister({ ...register, password: event.target.value })} /><span className="field-hint">Minim 10 caractere, litera mare, cifra si simbol.</span></label>
             <label>Mireasa & Mire<input required value={register.couple} onChange={(event) => setRegister({ ...register, couple: event.target.value })} /></label>
             <label>Data nuntii<input type="date" value={register.wedding_date} onChange={(event) => setRegister({ ...register, wedding_date: event.target.value })} /></label>
             <label>Locatie<input value={register.venue} onChange={(event) => setRegister({ ...register, venue: event.target.value })} /></label>
