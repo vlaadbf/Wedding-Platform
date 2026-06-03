@@ -161,6 +161,7 @@ function migrate() {
       table_id TEXT,
       table_name TEXT,
       invitation_sent INTEGER NOT NULL DEFAULT 0,
+      confirmed_at TEXT,
       updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
@@ -273,6 +274,7 @@ function migrate() {
   addColumn("users", "address", "TEXT");
   addColumn("users", "last_login_at", "TEXT");
   addColumn("media_uploads", "seen_at", "TEXT");
+  addColumn("guests", "confirmed_at", "TEXT");
   addColumn("activity_events", "seen_at", "TEXT");
   addColumn("weddings", "wedding_time", "TEXT");
   addColumn("weddings", "profile_image_url", "TEXT");
@@ -702,7 +704,10 @@ function listGuests(wedding, origin) {
     SELECT guests.*, seating_tables.name AS table_label
     FROM guests LEFT JOIN seating_tables ON seating_tables.id = guests.table_id
     WHERE guests.wedding_id = ?
-    ORDER BY guests.created_at DESC
+    ORDER BY
+      CASE WHEN guests.status = 'Confirmat' THEN 0 ELSE 1 END,
+      CASE WHEN guests.status = 'Confirmat' THEN COALESCE(guests.confirmed_at, guests.updated_at) ELSE guests.created_at END DESC,
+      guests.created_at DESC
   `).all(wedding.id).map((row) => guestRow(row, wedding, origin));
 }
 
@@ -922,9 +927,9 @@ async function handleApi(req, res, url) {
     while (mealChoices.length < seats) mealChoices.push("");
     const primaryMeal = mealChoices.find(Boolean) || String(body.meal_choice || "");
     db.prepare(`
-      UPDATE guests SET status = ?, seats = ?, meal_choice = ?, meal_choices_json = ?, allergies = ?, guest_message = ?, response_locked = 1, updated_at = CURRENT_TIMESTAMP
+      UPDATE guests SET status = ?, seats = ?, meal_choice = ?, meal_choices_json = ?, allergies = ?, guest_message = ?, response_locked = 1, confirmed_at = CASE WHEN ? = 'Confirmat' THEN CURRENT_TIMESTAMP ELSE confirmed_at END, updated_at = CURRENT_TIMESTAMP
       WHERE invitation_token = ?
-    `).run(status, seats, primaryMeal, JSON.stringify(mealChoices), String(body.allergies || ""), String(body.guest_message || ""), inviteToken);
+    `).run(status, seats, primaryMeal, JSON.stringify(mealChoices), String(body.allergies || ""), String(body.guest_message || ""), status, inviteToken);
     const activityType = status === "Confirmat" ? "rsvp_confirmed" : status === "Refuzat" ? "rsvp_declined" : "rsvp";
     const activityTitle = status === "Confirmat" ? `${guest.name} a acceptat invitatia` : `${guest.name} a trimis raspuns`;
     addActivity(guest.wedding_id, activityType, activityTitle, `${status} - ${seats} locuri`);
@@ -1324,19 +1329,26 @@ async function handleApi(req, res, url) {
     const guestId = url.pathname.split("/").pop();
     const current = db.prepare("SELECT * FROM guests WHERE id = ? AND wedding_id = ?").get(guestId, wedding.id);
     if (!current) return send(res, 404, { message: "Invitatul nu exista." });
+    const nextStatus = body.status === undefined ? current.status : String(body.status || "In asteptare");
+    const nextConfirmedAt = body.status === undefined
+      ? current.confirmed_at
+      : nextStatus === "Confirmat"
+        ? (current.confirmed_at || new Date().toISOString())
+        : null;
     db.prepare(`
-      UPDATE guests SET name = ?, phone = ?, side = ?, status = ?, meal_choice = ?, allergies = ?, seats = ?, table_id = ?, invitation_sent = COALESCE(?, invitation_sent), updated_at = CURRENT_TIMESTAMP
+      UPDATE guests SET name = ?, phone = ?, side = ?, status = ?, meal_choice = ?, allergies = ?, seats = ?, table_id = ?, invitation_sent = COALESCE(?, invitation_sent), confirmed_at = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ? AND wedding_id = ?
     `).run(
       body.name === undefined ? current.name : String(body.name || "Invitat"),
       body.phone === undefined ? current.phone : String(body.phone || ""),
       body.side === undefined ? current.side : String(body.side || "Comun"),
-      body.status === undefined ? current.status : String(body.status || "In asteptare"),
+      nextStatus,
       body.meal_choice === undefined ? current.meal_choice : String(body.meal_choice || ""),
       body.allergies === undefined ? current.allergies : String(body.allergies || ""),
       body.seats === undefined ? current.seats : Math.max(1, Number(body.seats) || 1),
       body.table_id === undefined ? current.table_id : String(body.table_id || ""),
       body.invitation_sent === undefined ? null : Number(Boolean(body.invitation_sent)),
+      nextConfirmedAt,
       guestId,
       wedding.id
     );

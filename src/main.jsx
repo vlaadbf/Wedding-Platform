@@ -122,9 +122,15 @@ function dateLabel(value) {
 
 function dateTimeLabel(value) {
   if (!value) return "Nu s-a conectat";
-  const date = new Date(value);
+  const normalized = String(value).includes("T") ? String(value) : String(value).replace(" ", "T");
+  const date = new Date(normalized);
   if (Number.isNaN(date.getTime())) return "Nu s-a conectat";
   return date.toLocaleString("ro-RO", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function confirmationLabel(guest) {
+  if (guest.status !== "Confirmat") return "-";
+  return dateTimeLabel(guest.confirmed_at || guest.updated_at);
 }
 
 const inviteImageResolution = "1920 x 1200 px";
@@ -655,6 +661,7 @@ function SuperAdmin({ mutate }) {
   const [admin, setAdmin] = useState(null);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [enteringWedding, setEnteringWedding] = useState(null);
   const [client, setClient] = useState({ name: "", email: "", password: "Client123!", couple: "", wedding_date: "", wedding_time: "", venue: "" });
 
   useEffect(() => {
@@ -672,8 +679,31 @@ function SuperAdmin({ mutate }) {
   const recentWeddings = [...admin.weddings].sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || ""))).slice(0, 5);
   const topByGuests = [...admin.weddings].sort((a, b) => Number(b.guests || 0) - Number(a.guests || 0)).slice(0, 5);
 
+  async function enterWedding(wedding) {
+    setEnteringWedding(wedding);
+    try {
+      await new Promise((resolve) => window.setTimeout(resolve, 650));
+      await mutate(`/api/weddings/${wedding.id}/select`, { method: "POST" });
+    } finally {
+      setEnteringWedding(null);
+    }
+  }
+
   return (
     <section className="module">
+      {enteringWedding ? (
+        <div className="admin-enter-overlay" role="status" aria-live="polite">
+          <section>
+            {enteringWedding.profile_image_url ? <img src={enteringWedding.profile_image_url} alt="" /> : <img src={appLogo} alt="" />}
+            <div>
+              <p className="eyebrow">Se deschide gestiunea</p>
+              <h3>{enteringWedding.couple}</h3>
+              <span>{enteringWedding.owner_name}</span>
+            </div>
+            <div className="admin-enter-progress"><span /></div>
+          </section>
+        </div>
+      ) : null}
       <div className="module-title">
         <div><p className="eyebrow">Super admin</p><h2>Dashboard platforma si clienti</h2></div>
       </div>
@@ -784,7 +814,7 @@ function SuperAdmin({ mutate }) {
                 <td>{money(wedding.paid)} / {money(wedding.planned)}</td>
                 <td>
                   <div className="row-actions">
-                    <button className="tool-button" onClick={() => mutate(`/api/weddings/${wedding.id}/select`, { method: "POST" })} type="button"><Eye size={17} />Intra</button>
+                    <button className="tool-button" onClick={() => enterWedding(wedding)} type="button"><Eye size={17} />Intra</button>
                     <button className="tool-button" onClick={async () => setAdmin(await api(`/api/admin/users/${wedding.owner_id}/status`, { method: "POST", body: JSON.stringify({ status: wedding.status === "inactive" ? "active" : "inactive" }) }))} type="button">{wedding.status === "inactive" ? "Activeaza" : "Dezactiveaza"}</button>
                   </div>
                 </td>
@@ -876,7 +906,6 @@ function Guests({ data, mutate }) {
   const totalPages = Math.max(1, Math.ceil(filteredGuests.length / pageSize));
   const currentPage = Math.min(page, totalPages);
   const pageGuests = filteredGuests.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-  const recentAcceptances = data.recentAcceptances || [];
 
   async function copyLink(guest) {
     await navigator.clipboard.writeText(guest.inviteUrl);
@@ -916,10 +945,10 @@ function Guests({ data, mutate }) {
   }
 
   function exportGuests() {
-    const headers = ["Nume", "Prenume", "Telefon", "Status", "Locuri", "Meniu", "Masa", "Link invitatie"];
+    const headers = ["Nume", "Prenume", "Telefon", "Status", "Confirmat la", "Locuri", "Meniu", "Masa", "Link invitatie"];
     const lines = filteredGuests.map((guest) => {
       const [firstName, ...rest] = String(guest.name || "").split(" ");
-      const row = [firstName || "", rest.join(" "), guest.phone || "", guest.status || "", guest.seats || "", mealSummary(guest), guest.table_label || guest.table_name || "", guest.inviteUrl || ""];
+      const row = [firstName || "", rest.join(" "), guest.phone || "", guest.status || "", confirmationLabel(guest), guest.seats || "", mealSummary(guest), guest.table_label || guest.table_name || "", guest.inviteUrl || ""];
       return row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(",");
     });
     const blob = new Blob([[headers.join(","), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
@@ -936,23 +965,6 @@ function Guests({ data, mutate }) {
       <div className="module-title">
         <div><p className="eyebrow">Invitati</p><h2>Confirmari detaliate si WhatsApp</h2></div>
       </div>
-      {recentAcceptances.length ? (
-        <section className="acceptance-strip">
-          <div>
-            <p className="eyebrow">{data.notifications?.newAcceptances ? "Confirmari noi" : "Ultimele confirmari"}</p>
-            <h3>{recentAcceptances[0].title}</h3>
-            <small>{recentAcceptances[0].detail}</small>
-          </div>
-          <div className="acceptance-list">
-            {recentAcceptances.slice(0, 3).map((item) => (
-              <article className={!item.seen_at ? "new" : ""} key={item.id}>
-                <strong>{item.title}</strong>
-                <span>{item.detail}</span>
-              </article>
-            ))}
-          </div>
-        </section>
-      ) : null}
       {canEdit ? <form className="entry-form guests-form" onSubmit={addGuest}>
         <input required placeholder="Nume" value={form.first_name} onChange={(event) => setForm({ ...form, first_name: event.target.value })} />
         <input required placeholder="Prenume" value={form.last_name} onChange={(event) => setForm({ ...form, last_name: event.target.value })} />
@@ -973,7 +985,7 @@ function Guests({ data, mutate }) {
       </div>
       <div className="table-wrap guest-table-wrap">
         <table>
-          <thead><tr><th>Invitat</th><th>Status</th><th>Locuri</th><th>Meniu</th><th>Masa</th><th>Invitatie</th><th></th></tr></thead>
+          <thead><tr><th>Invitat</th><th>Status</th><th>Confirmat la</th><th>Locuri</th><th>Meniu</th><th>Masa</th><th>Invitatie</th><th></th></tr></thead>
           <tbody>
             {pageGuests.map((guest) => {
               const [firstName, ...restName] = String(guest.name || "").split(" ");
@@ -983,6 +995,7 @@ function Guests({ data, mutate }) {
                   <tr>
                     <td><strong>{firstName} {restName.join(" ")}</strong><small>{guest.phone || "fara telefon"} - {guest.side}</small></td>
                     <td><span className={`pill ${guest.status === "Confirmat" ? "yes" : guest.status === "Refuzat" ? "no" : ""}`}>{guest.status}</span></td>
+                    <td><small>{confirmationLabel(guest)}</small></td>
                     <td>{guest.seats} <small>{partyLabel(guest.seats)}</small></td>
                     <td><small>{mealSummary(guest)}</small><small>{guest.allergies || ""}</small></td>
                     <td>{guest.table_label || guest.table_name || "-"}</td>
@@ -1001,7 +1014,7 @@ function Guests({ data, mutate }) {
                   </tr>
                   {isEditing ? (
                     <tr className="edit-row">
-                      <td colSpan="7">
+                      <td colSpan="8">
                         <form className="inline-edit-form" onSubmit={saveGuestEdit}>
                           <input required placeholder="Nume" value={editGuest.first_name} onChange={(event) => setEditGuest({ ...editGuest, first_name: event.target.value })} />
                           <input required placeholder="Prenume" value={editGuest.last_name} onChange={(event) => setEditGuest({ ...editGuest, last_name: event.target.value })} />

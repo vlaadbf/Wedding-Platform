@@ -67,7 +67,12 @@ body {
   background:
     linear-gradient(135deg, rgba(102, 138, 112, 0.12), transparent 36%),
     linear-gradient(145deg, #f9fbfa 0%, #f0f5f6 55%, #fbf7f1 100%);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
+}
+
+body,
+body * {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", Arial, sans-serif !important;
 }
 
 body:has(.theme-dark) {
@@ -838,7 +843,7 @@ textarea {
 .auth-input input:-webkit-autofill:focus {
   -webkit-text-fill-color: var(--ink);
   caret-color: var(--ink);
-  box-shadow: 0 0 0 1000px color-mix(in srgb, var(--sage) 7%, white) inset;
+  box-shadow: 0 0 0 1000px white inset;
   transition: background-color 9999s ease-out;
 }
 
@@ -2481,15 +2486,25 @@ tr:last-child td {
 .confirm-dialog {
   position: relative;
   display: grid;
-  gap: 14px;
-  width: min(100%, 460px);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 28px;
+  gap: 16px;
+  width: min(100%, 430px);
+  border: 1px solid color-mix(in srgb, var(--gold) 30%, var(--line));
+  border-radius: 18px;
+  padding: 30px;
   background:
-    linear-gradient(135deg, color-mix(in srgb, var(--sage) 8%, white), white 48%),
+    radial-gradient(circle at 14% 8%, color-mix(in srgb, var(--gold) 16%, transparent), transparent 12rem),
+    linear-gradient(135deg, color-mix(in srgb, var(--sage) 7%, white), white 52%),
     white;
-  box-shadow: 0 28px 80px rgba(13, 20, 24, 0.26);
+  box-shadow: 0 30px 90px rgba(13, 20, 24, 0.28);
+  animation: authCardIn 0.22s ease both;
+}
+
+.confirm-dialog::before {
+  content: "";
+  width: 46px;
+  height: 5px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--sage-dark), var(--gold));
 }
 
 .confirm-dialog h2,
@@ -2498,17 +2513,34 @@ tr:last-child td {
 }
 
 .confirm-dialog h2 {
-  font-size: 28px;
+  font-size: 30px;
+  line-height: 1.05;
 }
 
 .confirm-dialog p {
   margin-bottom: 4px;
   color: var(--muted);
-  font-size: 18px;
+  font-size: 16px;
+  line-height: 1.45;
 }
 
 .confirm-dialog .row-actions {
-  margin-top: 4px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.confirm-dialog .tool-button {
+  min-height: 44px;
+  justify-content: center;
+  border-radius: 10px;
+  font-weight: 900;
+}
+
+.confirm-dialog .tool-button:not(.danger-fill) {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--sage) 8%, white);
 }
 
 .edit-dialog {
@@ -2535,6 +2567,12 @@ tr:last-child td {
     #18201e;
 }
 
+.theme-dark .admin-enter-overlay section,
+.theme-dark .admin-enter-progress,
+.theme-dark .confirm-dialog .tool-button:not(.danger-fill) {
+  background: #111716;
+}
+
 .theme-dark .modal-close {
   background: #111716;
 }
@@ -2543,6 +2581,70 @@ tr:last-child td {
   color: white;
   border-color: var(--danger);
   background: var(--danger);
+}
+
+.admin-enter-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(13, 20, 24, 0.52);
+  backdrop-filter: blur(10px);
+}
+
+.admin-enter-overlay section {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  width: min(100%, 360px);
+  border: 1px solid color-mix(in srgb, var(--gold) 30%, var(--line));
+  border-radius: 18px;
+  padding: 28px;
+  text-align: center;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--sage) 8%, white), white 58%),
+    white;
+  box-shadow: 0 30px 90px rgba(13, 20, 24, 0.28);
+  animation: authCardIn 0.22s ease both;
+}
+
+.admin-enter-overlay img {
+  width: 74px;
+  height: 74px;
+  border: 2px solid rgba(185, 139, 66, 0.34);
+  border-radius: 50%;
+  object-fit: cover;
+  padding: 5px;
+  background: white;
+}
+
+.admin-enter-overlay h3 {
+  margin: 2px 0 4px;
+  font-size: 26px;
+}
+
+.admin-enter-overlay span {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.admin-enter-progress {
+  overflow: hidden;
+  width: 100%;
+  height: 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sage) 12%, white);
+}
+
+.admin-enter-progress span {
+  display: block;
+  width: 45%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--sage-dark), var(--gold));
+  animation: authProgress 0.9s ease-in-out infinite;
 }
 
 .upload-list p,
@@ -4351,7 +4453,8 @@ tr:last-child td {
   .guest-table-wrap td:nth-child(2),
   .guest-table-wrap td:nth-child(3),
   .guest-table-wrap td:nth-child(4),
-  .guest-table-wrap td:nth-child(5) {
+  .guest-table-wrap td:nth-child(5),
+  .guest-table-wrap td:nth-child(6) {
     display: grid;
     grid-template-columns: minmax(74px, auto) minmax(0, 1fr);
     width: auto;
@@ -4365,11 +4468,11 @@ tr:last-child td {
     font-size: 13px;
   }
 
-  .guest-table-wrap td:nth-child(4) {
+  .guest-table-wrap td:nth-child(5) {
     align-items: start;
   }
 
-  .guest-table-wrap td:nth-child(4) small {
+  .guest-table-wrap td:nth-child(5) small {
     display: block;
     max-width: 100%;
     text-align: right;
@@ -4377,7 +4480,8 @@ tr:last-child td {
 
   .guest-table-wrap td:nth-child(2) > :not(:first-child),
   .guest-table-wrap td:nth-child(3) > :not(:first-child),
-  .guest-table-wrap td:nth-child(5) > :not(:first-child) {
+  .guest-table-wrap td:nth-child(4) > :not(:first-child),
+  .guest-table-wrap td:nth-child(6) > :not(:first-child) {
     justify-self: end;
   }
 
@@ -4388,25 +4492,31 @@ tr:last-child td {
   }
 
   .guest-table-wrap td:nth-child(3)::before {
-    content: "Locuri";
+    content: "Confirmat";
     color: var(--muted);
     font-weight: 900;
   }
 
   .guest-table-wrap td:nth-child(4)::before {
-    content: "Meniu";
+    content: "Locuri";
     color: var(--muted);
     font-weight: 900;
   }
 
   .guest-table-wrap td:nth-child(5)::before {
+    content: "Meniu";
+    color: var(--muted);
+    font-weight: 900;
+  }
+
+  .guest-table-wrap td:nth-child(6)::before {
     content: "Masa";
     color: var(--muted);
     font-weight: 900;
   }
 
-  .guest-table-wrap td:nth-child(6),
-  .guest-table-wrap td:nth-child(7) {
+  .guest-table-wrap td:nth-child(7),
+  .guest-table-wrap td:nth-child(8) {
     border-top: 1px solid var(--line);
     padding-top: 12px;
   }
@@ -4443,7 +4553,8 @@ tr:last-child td {
   .theme-dark .guest-table-wrap td:nth-child(2),
   .theme-dark .guest-table-wrap td:nth-child(3),
   .theme-dark .guest-table-wrap td:nth-child(4),
-  .theme-dark .guest-table-wrap td:nth-child(5) {
+  .theme-dark .guest-table-wrap td:nth-child(5),
+  .theme-dark .guest-table-wrap td:nth-child(6) {
     background: #131a18;
   }
 
@@ -4456,6 +4567,69 @@ tr:last-child td {
   .pagination .row-actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
+  }
+
+  .calendar-toolbar {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+    margin: 14px 0 10px;
+  }
+
+  .calendar-toolbar strong {
+    order: -1;
+    text-align: center;
+    font-size: 16px;
+  }
+
+  .calendar-toolbar .tool-button {
+    min-height: 36px;
+  }
+
+  .calendar-board {
+    gap: 4px;
+  }
+
+  .calendar-weekday {
+    font-size: 10px;
+    text-align: center;
+  }
+
+  .calendar-day {
+    gap: 3px;
+    min-height: 54px;
+    border-radius: 6px;
+    padding: 5px 4px;
+  }
+
+  .calendar-day time {
+    font-size: 12px;
+  }
+
+  .calendar-dot {
+    min-height: 6px;
+    border-radius: 999px;
+    padding: 0;
+    color: transparent;
+    font-size: 0;
+  }
+
+  .calendar-dot:nth-of-type(n + 3) {
+    display: none;
+  }
+
+  .confirm-dialog {
+    width: min(100%, 340px);
+    padding: 24px 18px;
+    border-radius: 16px;
+  }
+
+  .confirm-dialog h2 {
+    font-size: 26px;
+  }
+
+  .confirm-dialog .row-actions {
+    grid-template-columns: 1fr;
   }
 
   .team-list article {
