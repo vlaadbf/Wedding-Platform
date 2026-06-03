@@ -813,6 +813,35 @@ textarea {
   font-weight: 900;
 }
 
+.auth-form .auth-input .password-toggle {
+  display: grid;
+  width: 28px;
+  min-height: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 8px;
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  box-shadow: none;
+}
+
+.auth-form .auth-input .password-toggle:hover,
+.auth-form .auth-input .password-toggle:focus-visible {
+  color: var(--sage-dark);
+  background: color-mix(in srgb, var(--sage) 10%, transparent);
+  outline: none;
+}
+
+.auth-input input:-webkit-autofill,
+.auth-input input:-webkit-autofill:hover,
+.auth-input input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--ink);
+  caret-color: var(--ink);
+  box-shadow: 0 0 0 1000px color-mix(in srgb, var(--sage) 7%, white) inset;
+  transition: background-color 9999s ease-out;
+}
+
 .auth-form .auth-submit {
   min-height: 34px;
   border-radius: 7px;
