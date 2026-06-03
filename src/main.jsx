@@ -8,10 +8,12 @@ import {
   Copy,
   Download,
   Eye,
+  EyeOff,
   FileArchive,
   ImageUp,
   LogOut,
   MapPin,
+  Menu,
   MessageCircle,
   Pencil,
   Plus,
@@ -28,12 +30,15 @@ import {
   Camera,
   Clock,
   FileText,
+  LockKeyhole,
+  Mail,
   Search,
   ShieldCheck,
+  User,
   X
 } from "lucide-react";
 import "./styles.css";
-import templateOneIcon from "./invitatii-personalizate/Template 1/wedding-icon.svg";
+import appLogo from "./assets/logo.png";
 
 const emptyGuest = {
   first_name: "",
@@ -91,7 +96,7 @@ function canRole(role, required) {
 }
 
 const invitationTemplates = [
-  { key: "custom", title: "Template 1", description: "Layout cu 2 media, RSVP si program", resolution: "1920x1080 px", secondaryResolution: "1200x900 px", icon: templateOneIcon }
+  { key: "custom", title: "Template 1", description: "Layout cu 2 media, RSVP si program", resolution: "1920x1080 px", secondaryResolution: "1200x900 px", icon: appLogo }
 ];
 
 async function api(path, options = {}) {
@@ -113,6 +118,13 @@ function money(value) {
 function dateLabel(value) {
   if (!value) return "Data necompletata";
   return new Date(`${value}T12:00:00`).toLocaleDateString("ro-RO", { day: "numeric", month: "long", year: "numeric" });
+}
+
+function dateTimeLabel(value) {
+  if (!value) return "Nu s-a conectat";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Nu s-a conectat";
+  return date.toLocaleString("ro-RO", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 const inviteImageResolution = "1920 x 1200 px";
@@ -182,7 +194,7 @@ function App() {
 }
 
 function ScreenLoader() {
-  return <main className="center-screen"><div className="wedding-loader"><span /> <strong>Se incarca platforma</strong></div></main>;
+  return <main className="center-screen"><div className="wedding-loader"><img src={appLogo} alt="" /> <strong>Se incarca platforma</strong></div></main>;
 }
 
 function ConfirmDialog({ title = "Esti sigur?", message, confirmLabel = "Sterge", onCancel, onConfirm }) {
@@ -245,7 +257,9 @@ function useConfirmDelete(mutate) {
 function AuthScreen({ onAuth }) {
   const [mode, setMode] = useState("login");
   const [login, setLogin] = useState({ email: "admin@nunta.local", password: "admin123" });
-  const [register, setRegister] = useState({ name: "", email: "", password: "", couple: "", wedding_date: "", venue: "" });
+  const [register, setRegister] = useState({ name: "", email: "", password: "" });
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [error, setError] = useState("");
   const [loadingMessage, setLoadingMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -275,7 +289,7 @@ function AuthScreen({ onAuth }) {
       await api("/api/register", { method: "POST", body: JSON.stringify(register) });
       setLoadingMessage("");
       setSuccessMessage("Cont inregistrat cu succes. Te trimitem la conectare.");
-      setRegister({ name: "", email: "", password: "", couple: "", wedding_date: "", venue: "" });
+      setRegister({ name: "", email: "", password: "" });
       window.setTimeout(() => {
         setMode("login");
         setSuccessMessage("");
@@ -288,34 +302,34 @@ function AuthScreen({ onAuth }) {
 
   return (
     <main className="login-screen">
-      <section className="login-panel wide">
-        <div>
+      <section className={`login-panel auth-card ${mode === "register" ? "register-card" : ""}`}>
+        <div className="auth-card-head">
+          <div className="auth-card-icon"><img src={appLogo} alt="Gestionare Nunta" /></div>
           <p className="eyebrow">Platforma pentru miri</p>
-          <h1>{mode === "login" ? "Autentificare" : "Creeaza cont si nunta"}</h1>
-        </div>
-        <div className="segmented">
-          <button className={mode === "login" ? "active" : ""} onClick={() => { setMode("login"); setError(""); setSuccessMessage(""); }} type="button">Login</button>
-          <button className={mode === "register" ? "active" : ""} onClick={() => { setMode("register"); setError(""); setSuccessMessage(""); }} type="button">Cont nou</button>
+          <h1>{mode === "login" ? "Autentificare" : "Inregistrare"}</h1>
+          {mode === "login" ? <p>Bine ai revenit. Conecteaza-te ca sa continui organizarea.</p> : null}
         </div>
         {loadingMessage ? <AuthMotion type={mode} message={loadingMessage} /> : null}
         {successMessage ? <AuthMotion type="success" message={successMessage} /> : null}
         {mode === "login" ? (
-          <form className="login-form" onSubmit={submitLogin}>
-            <label>Email<input value={login.email} onChange={(event) => setLogin({ ...login, email: event.target.value })} /></label>
-            <label>Parola<input type="password" value={login.password} onChange={(event) => setLogin({ ...login, password: event.target.value })} /></label>
+          <form className="login-form auth-form" onSubmit={submitLogin}>
+            <label>Email<span className="auth-input"><Mail size={19} /><input placeholder="exemplu@email.com" value={login.email} onChange={(event) => setLogin({ ...login, email: event.target.value })} /></span></label>
+            <label>Parola<span className="auth-input"><LockKeyhole size={19} /><input placeholder="Parola contului" type={showLoginPassword ? "text" : "password"} value={login.password} onChange={(event) => setLogin({ ...login, password: event.target.value })} /><button className="password-toggle" type="button" aria-label={showLoginPassword ? "Ascunde parola" : "Arata parola"} onClick={() => setShowLoginPassword(!showLoginPassword)}>{showLoginPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></span></label>
+            <div className="auth-options"><label><input type="checkbox" />Tine-ma minte</label></div>
             {error ? <p className="form-error">{error}</p> : null}
-            <button disabled={Boolean(loadingMessage)} type="submit">Intra in platforma</button>
+            <button className="auth-submit" disabled={Boolean(loadingMessage)} type="submit">Conecteaza-te</button>
+            <div className="auth-divider"><span />sau<span /></div>
+            <p className="auth-switch">Nu ai cont? <button onClick={() => { setMode("register"); setError(""); setSuccessMessage(""); }} type="button">Inregistreaza-te</button></p>
           </form>
         ) : (
-          <form className="login-form register-grid" onSubmit={submitRegister}>
-            <label>Nume cont<input required value={register.name} onChange={(event) => setRegister({ ...register, name: event.target.value })} /></label>
-            <label>Email<input required type="email" value={register.email} onChange={(event) => setRegister({ ...register, email: event.target.value })} /></label>
-            <label>Parola<input required type="password" minLength="10" value={register.password} onChange={(event) => setRegister({ ...register, password: event.target.value })} /><span className="field-hint">Minim 10 caractere, litera mare, cifra si simbol.</span></label>
-            <label>Mireasa & Mire<input required value={register.couple} onChange={(event) => setRegister({ ...register, couple: event.target.value })} /></label>
-            <label>Data nuntii<input type="date" value={register.wedding_date} onChange={(event) => setRegister({ ...register, wedding_date: event.target.value })} /></label>
-            <label>Locatie<input value={register.venue} onChange={(event) => setRegister({ ...register, venue: event.target.value })} /></label>
+          <form className="login-form auth-form" onSubmit={submitRegister}>
+            <label>Nume cont<span className="auth-input"><User size={19} /><input required placeholder="Numele tau complet" value={register.name} onChange={(event) => setRegister({ ...register, name: event.target.value })} /></span></label>
+            <label>Email<span className="auth-input"><Mail size={19} /><input required placeholder="exemplu@email.com" type="email" value={register.email} onChange={(event) => setRegister({ ...register, email: event.target.value })} /></span></label>
+            <label>Parola<span className="auth-input"><LockKeyhole size={19} /><input required placeholder="Minim 10 caractere" type={showRegisterPassword ? "text" : "password"} minLength="10" value={register.password} onChange={(event) => setRegister({ ...register, password: event.target.value })} /><button className="password-toggle" type="button" aria-label={showRegisterPassword ? "Ascunde parola" : "Arata parola"} onClick={() => setShowRegisterPassword(!showRegisterPassword)}>{showRegisterPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></span><span className="field-hint">Litera mare, cifra si simbol.</span></label>
             {error ? <p className="form-error span-2">{error}</p> : null}
-            <button className="span-2" disabled={Boolean(loadingMessage)} type="submit">Creeaza contul</button>
+            <button className="auth-submit" disabled={Boolean(loadingMessage)} type="submit">Creeaza cont</button>
+            <div className="auth-divider"><span />sau<span /></div>
+            <p className="auth-switch">Ai deja cont? <button onClick={() => { setMode("login"); setError(""); setSuccessMessage(""); }} type="button">Autentifica-te</button></p>
           </form>
         )}
       </section>
@@ -328,10 +342,13 @@ function Dashboard({ session, onLogout }) {
   const [active, setActive] = useState("guests");
   const [error, setError] = useState("");
   const [logoutConfirm, setLogoutConfirm] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   useEffect(() => { refresh(); }, []);
   useEffect(() => {
     if (active === "room") setActive("tables");
+    if (active === "invitation") setActive("guests");
+    if (active === "photos") setActive("media");
   }, [active]);
 
   async function refresh() {
@@ -363,6 +380,9 @@ function Dashboard({ session, onLogout }) {
   }
 
   if (!data) return <ScreenLoader />;
+  if (canRole(data.wedding.role, "owner") && !session.user.isSuperAdmin && !Number(data.wedding.onboarding_completed || 0)) {
+    return <OnboardingWizard data={data} onDone={setData} />;
+  }
 
   const confirmedSeats = data.guests.filter((guest) => guest.status === "Confirmat").reduce((sum, guest) => sum + Number(guest.seats || 0), 0);
   const paid = data.suppliers.reduce((sum, item) => sum + Number(item.advance || 0), 0);
@@ -376,38 +396,46 @@ function Dashboard({ session, onLogout }) {
     ["tables", "Mese", Table2],
     ["suppliers", "Financiar", WalletCards],
     ["calendar", "Calendar", CalendarDays],
-    ["invitation", "Invitatie", FileText],
     ["exports", "Export", Download],
-    ["media", "QR Media", QrCode],
-    ["photos", "Poze", Camera],
+    ["media", "Media", Camera],
     ...(canRole(role, "owner") ? [["team", "Roluri", UserPlus], ["settings", "Setari", Settings]] : [])
-  ].filter(([key]) => canRole(role, "owner") || !["invitation"].includes(key));
+  ];
 
   return (
     <div className={`app-shell theme-${data.wedding.theme_color || "sage"}`}>
-      <aside className="sidebar">
+      {mobileMenuOpen ? <button className="mobile-menu-backdrop" aria-label="Inchide meniul" onClick={() => setMobileMenuOpen(false)} type="button" /> : null}
+      <aside className={`sidebar ${mobileMenuOpen ? "mobile-open" : ""}`}>
+        <button className="mobile-menu-close" aria-label="Inchide meniul" onClick={() => setMobileMenuOpen(false)} type="button"><X size={18} /></button>
         <div className="brand">
-          {data.wedding.profile_image_url ? <img className="profile-photo" src={data.wedding.profile_image_url} alt={data.wedding.couple} /> : <span>GN</span>}
+          {data.wedding.profile_image_url ? <img className="profile-photo" src={data.wedding.profile_image_url} alt={data.wedding.couple} /> : <img className="brand-logo" src={appLogo} alt="Gestionare Nunta" />}
           <div>
             <strong>{data.wedding.couple}</strong>
             <small>{data.wedding.venue || "Nunta activa"}</small>
           </div>
         </div>
+        <div className="sidebar-user">
+          <small>Conectat ca</small>
+          <strong>{session.user.name}</strong>
+        </div>
         <SidebarCountdown wedding={data.wedding} />
-        <WeddingSwitcher data={data} mutate={mutate} />
         <nav>
           {tabs.map(([key, label, Icon]) => (
             <button className={active === key ? "active" : ""} key={key} onClick={() => {
               setActive(key);
+              setMobileMenuOpen(false);
               if (canRole(data.wedding.role, "planner") && key === "guests" && data.notifications?.newAcceptances) mutate("/api/rsvp-acceptances/seen", { method: "POST" });
-              if (canRole(data.wedding.role, "planner") && key === "photos" && data.notifications?.newUploads) mutate("/api/media-uploads/seen", { method: "POST" });
+              if (canRole(data.wedding.role, "planner") && key === "media" && data.notifications?.newUploads) mutate("/api/media-uploads/seen", { method: "POST" });
             }} type="button">
               <Icon size={18} />{label}
               {key === "guests" && data.notifications?.newAcceptances ? <span className="nav-badge">{data.notifications.newAcceptances}</span> : null}
-              {key === "photos" && data.notifications?.newUploads ? <span className="nav-badge">{data.notifications.newUploads}</span> : null}
+              {key === "media" && data.notifications?.newUploads ? <span className="nav-badge">{data.notifications.newUploads}</span> : null}
             </button>
           ))}
         </nav>
+        <button className="sidebar-logout" onClick={() => {
+          setMobileMenuOpen(false);
+          setLogoutConfirm(true);
+        }} type="button"><LogOut size={18} />Deconectare</button>
       </aside>
 
       <main className="workspace">
@@ -417,8 +445,7 @@ function Dashboard({ session, onLogout }) {
             <h1>{data.wedding.couple}</h1>
           </div>
           <div className="user-tools">
-            <span>{session.user.name}</span>
-            <button className="icon-button" onClick={() => setLogoutConfirm(true)} title="Deconectare" type="button"><LogOut size={18} /></button>
+            <button className="icon-button mobile-menu-toggle" onClick={() => setMobileMenuOpen(true)} title="Meniu" type="button"><Menu size={18} /></button>
           </div>
         </header>
 
@@ -435,14 +462,12 @@ function Dashboard({ session, onLogout }) {
 
         {active === "admin" ? <SuperAdmin mutate={mutate} /> : null}
         {active === "progress" ? <ProgressReports data={data} /> : null}
-        {active === "guests" ? <Guests data={data} mutate={mutate} /> : null}
+        {active === "guests" ? <GuestInvitationHub data={data} mutate={mutate} /> : null}
         {active === "tables" ? <SeatingSection data={data} mutate={mutate} /> : null}
         {active === "suppliers" ? <Suppliers data={data} mutate={mutate} /> : null}
         {active === "calendar" ? <CalendarView data={data} mutate={mutate} /> : null}
-        {active === "invitation" ? <InvitationSettings data={data} mutate={mutate} /> : null}
         {active === "exports" ? <Exports /> : null}
-        {active === "media" ? <MediaQr data={data} /> : null}
-        {active === "photos" ? <Photos data={data} /> : null}
+        {active === "media" ? <MediaHub data={data} mutate={mutate} /> : null}
         {active === "team" ? <Team data={data} mutate={mutate} /> : null}
         {active === "settings" ? <SettingsPanel data={data} mutate={mutate} /> : null}
         {logoutConfirm ? (
@@ -491,6 +516,141 @@ function WeddingSwitcher({ data, mutate }) {
   );
 }
 
+function OnboardingWizard({ data, onDone }) {
+  const themes = [
+    { key: "sage", label: "Salvie", colors: ["#668a70", "#b98b42", "#ffffff"] },
+    { key: "rose", label: "Rose", colors: ["#b77982", "#8e4f5b", "#ffffff"] },
+    { key: "navy", label: "Navy", colors: ["#4f6f88", "#c4a15c", "#ffffff"] },
+    { key: "dark", label: "Dark", colors: ["#111716", "#d1b76f", "#f5f2ea"] }
+  ];
+  const [step, setStep] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [form, setForm] = useState({
+    phone: "",
+    address: "",
+    couple: data.wedding.couple || "",
+    wedding_date: data.wedding.wedding_date || "",
+    wedding_time: data.wedding.wedding_time || "",
+    venue: data.wedding.venue || "",
+    venue_address: data.wedding.venue_address || "",
+    map_url: data.wedding.map_url || "",
+    theme_color: data.wedding.theme_color || "sage",
+    profile_image_url: data.wedding.profile_image_url || "",
+    profile_data_url: ""
+  });
+  const steps = ["Contact", "Eveniment", "Design", "Final"];
+
+  function update(next) {
+    setError("");
+    setForm(next);
+  }
+
+  async function uploadProfile(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const dataUrl = await fileToDataUrl(file);
+    update({ ...form, profile_data_url: dataUrl, profile_image_url: dataUrl });
+  }
+
+  async function submit() {
+    setSaving(true);
+    setError("");
+    try {
+      const updated = await api("/api/onboarding", { method: "POST", body: JSON.stringify(form) });
+      onDone(updated);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <main className={`onboarding-screen theme-${form.theme_color || "sage"}`}>
+      <section className="onboarding-phone">
+        <div className="onboarding-top">
+          <img src={appLogo} alt="Gestionare Nunta" />
+          <div>
+            <p className="eyebrow">Configurare initiala</p>
+            <h1>Hai sa pregatim nunta</h1>
+          </div>
+        </div>
+        <div className="onboarding-steps">
+          {steps.map((item, index) => <span className={index <= step ? "active" : ""} key={item}>{index + 1}</span>)}
+        </div>
+
+        {step === 0 ? (
+          <div className="onboarding-step">
+            <h2>Date de contact</h2>
+            <p>Aceste date raman in cont si ajuta la administrare.</p>
+            <label>Telefon<span className="auth-input"><PhoneIcon /><input placeholder="07xx xxx xxx" value={form.phone} onChange={(event) => update({ ...form, phone: event.target.value })} /></span></label>
+            <label>Adresa ta<span className="auth-input"><MapPin size={19} /><input placeholder="Oras / adresa" value={form.address} onChange={(event) => update({ ...form, address: event.target.value })} /></span></label>
+          </div>
+        ) : null}
+
+        {step === 1 ? (
+          <div className="onboarding-step">
+            <h2>Detalii eveniment</h2>
+            <p>Le poti modifica oricand mai tarziu din setari.</p>
+            <label>Mireasa & Mire<span className="auth-input"><Users size={19} /><input value={form.couple} onChange={(event) => update({ ...form, couple: event.target.value })} /></span></label>
+            <div className="auth-inline-fields">
+              <label>Data<span className="auth-input"><CalendarDays size={19} /><input type="date" value={form.wedding_date} onChange={(event) => update({ ...form, wedding_date: event.target.value })} /></span></label>
+              <label>Ora<span className="auth-input"><Clock size={19} /><input type="time" value={form.wedding_time} onChange={(event) => update({ ...form, wedding_time: event.target.value })} /></span></label>
+            </div>
+            <label>Restaurant<span className="auth-input"><MapPin size={19} /><input placeholder="Numele restaurantului" value={form.venue} onChange={(event) => update({ ...form, venue: event.target.value })} /></span></label>
+            <label>Adresa restaurantului<span className="auth-input"><MapPin size={19} /><input placeholder="Adresa completa" value={form.venue_address} onChange={(event) => update({ ...form, venue_address: event.target.value })} /></span></label>
+          </div>
+        ) : null}
+
+        {step === 2 ? (
+          <div className="onboarding-step">
+            <h2>Design si profil</h2>
+            <p>Alege tema platformei si poza mirilor.</p>
+            <div className="onboarding-theme-grid">
+              {themes.map((theme) => (
+                <button className={form.theme_color === theme.key ? "selected" : ""} key={theme.key} onClick={() => update({ ...form, theme_color: theme.key })} type="button">
+                  <span>{theme.colors.map((color) => <i key={color} style={{ background: color }} />)}</span>
+                  {theme.label}
+                </button>
+              ))}
+            </div>
+            <label className="file-field">Poza de profil miri
+              <span className="file-picker">
+                <input type="file" accept="image/*" onChange={uploadProfile} />
+                <span><ImageUp size={17} />Alege poza</span>
+              </span>
+            </label>
+            {form.profile_image_url ? <img className="onboarding-profile-preview" src={form.profile_image_url} alt="Preview profil" /> : null}
+          </div>
+        ) : null}
+
+        {step === 3 ? (
+          <div className="onboarding-step done">
+            <h2>Totul este pregatit</h2>
+            <p>Salvam configurarea initiala si intri in platforma.</p>
+            <div className="onboarding-summary">
+              <span>{form.couple || "Nunta"}</span>
+              <span>{form.venue || "Restaurant necompletat"}</span>
+              <span>{themes.find((theme) => theme.key === form.theme_color)?.label || "Tema"}</span>
+            </div>
+          </div>
+        ) : null}
+
+        {error ? <p className="form-error">{error}</p> : null}
+        <div className="onboarding-actions">
+          <button className="tool-button" disabled={step === 0 || saving} onClick={() => setStep(step - 1)} type="button">Inapoi</button>
+          {step < steps.length - 1 ? <button className="settings-save" onClick={() => setStep(step + 1)} type="button">Continua</button> : <button className="settings-save" disabled={saving} onClick={submit} type="button">{saving ? "Se salveaza..." : "Intra in platforma"}</button>}
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function PhoneIcon() {
+  return <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.35 1.9.66 2.81a2 2 0 0 1-.45 2.11L8.05 9.91a16 16 0 0 0 6.04 6.04l1.27-1.27a2 2 0 0 1 2.11-.45c.91.31 1.85.53 2.81.66A2 2 0 0 1 22 16.92z" /></svg>;
+}
+
 function SuperAdmin({ mutate }) {
   const [admin, setAdmin] = useState(null);
   const [error, setError] = useState("");
@@ -504,6 +664,13 @@ function SuperAdmin({ mutate }) {
   if (error) return <section className="module"><p className="form-error">{error}</p></section>;
   if (!admin) return <section className="module"><div className="loader" /></section>;
   const weddings = admin.weddings.filter((wedding) => [wedding.couple, wedding.owner_name, wedding.owner_email, wedding.venue].join(" ").toLowerCase().includes(search.toLowerCase()));
+  const activeClients = admin.weddings.filter((wedding) => wedding.status !== "inactive").length;
+  const inactiveClients = admin.weddings.length - activeClients;
+  const upcomingWeddings = admin.weddings.filter((wedding) => wedding.wedding_date && new Date(`${wedding.wedding_date}T23:59:59`) >= new Date()).length;
+  const acceptanceRate = admin.totals.guests ? Math.round((admin.weddings.reduce((sum, wedding) => sum + Number(wedding.confirmed || 0), 0) / admin.totals.guests) * 100) : 0;
+  const budgetRate = admin.totals.planned ? Math.round((Number(admin.totals.paid || 0) / Number(admin.totals.planned || 1)) * 100) : 0;
+  const recentWeddings = [...admin.weddings].sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || ""))).slice(0, 5);
+  const topByGuests = [...admin.weddings].sort((a, b) => Number(b.guests || 0) - Number(a.guests || 0)).slice(0, 5);
 
   return (
     <section className="module">
@@ -516,6 +683,71 @@ function SuperAdmin({ mutate }) {
         <Metric icon={<Bell />} label="Uploaduri noi" value={admin.totals.newUploads} detail={`${admin.totals.uploads} total`} />
         <Metric icon={<WalletCards />} label="Platit total" value={money(admin.totals.paid)} detail={`${money(admin.totals.planned)} planificat`} />
       </section>
+      <section className="admin-insights-grid">
+        <article className="admin-insight-card">
+          <div>
+            <p className="eyebrow">Status clienti</p>
+            <h3>{activeClients} activi</h3>
+            <span>{inactiveClients} dezactivati</span>
+          </div>
+          <div className="mini-bars">
+            <span style={{ width: `${admin.weddings.length ? Math.max(8, (activeClients / admin.weddings.length) * 100) : 0}%` }} />
+          </div>
+        </article>
+        <article className="admin-insight-card">
+          <div>
+            <p className="eyebrow">Nunti viitoare</p>
+            <h3>{upcomingWeddings}</h3>
+            <span>din {admin.totals.weddings} gestionari</span>
+          </div>
+          <CalendarDays size={38} />
+        </article>
+        <article className="admin-insight-card">
+          <div>
+            <p className="eyebrow">Rata confirmari</p>
+            <h3>{acceptanceRate}%</h3>
+            <span>locuri confirmate din invitati</span>
+          </div>
+          <div className="mini-bars"><span style={{ width: `${acceptanceRate}%` }} /></div>
+        </article>
+        <article className="admin-insight-card">
+          <div>
+            <p className="eyebrow">Buget incasat</p>
+            <h3>{budgetRate}%</h3>
+            <span>{money(admin.totals.paid)} platit</span>
+          </div>
+          <div className="mini-bars"><span style={{ width: `${budgetRate}%` }} /></div>
+        </article>
+      </section>
+      <section className="admin-snapshot-grid">
+        <article className="report-card admin-list-card">
+          <h3>Ultimi clienti adaugati</h3>
+          {recentWeddings.length ? recentWeddings.map((wedding) => (
+            <p key={wedding.id}>
+              <strong>{wedding.couple}</strong>
+              <span>{wedding.owner_email}</span>
+            </p>
+          )) : <p><strong>Nu exista clienti</strong><span>-</span></p>}
+        </article>
+        <article className="report-card admin-list-card">
+          <h3>Nunti cu cei mai multi invitati</h3>
+          {topByGuests.length ? topByGuests.map((wedding) => (
+            <p key={wedding.id}>
+              <strong>{wedding.couple}</strong>
+              <span>{wedding.guests} invitati</span>
+            </p>
+          )) : <p><strong>Nu exista invitati</strong><span>-</span></p>}
+        </article>
+        <article className="report-card admin-list-card">
+          <h3>Atentionari rapide</h3>
+          <p><strong>Uploaduri nevazute</strong><span>{admin.totals.newUploads}</span></p>
+          <p><strong>Clienti dezactivati</strong><span>{inactiveClients}</span></p>
+          <p><strong>Fara data nunta</strong><span>{admin.weddings.filter((wedding) => !wedding.wedding_date).length}</span></p>
+        </article>
+      </section>
+      <div className="module-title compact-title">
+        <div><p className="eyebrow">Nunta noua</p><h2>Creeaza client si nunta</h2></div>
+      </div>
       <form className="entry-form admin-client-form" onSubmit={async (event) => {
         event.preventDefault();
         const updated = await api("/api/admin/clients", { method: "POST", body: JSON.stringify(client) });
@@ -529,17 +761,23 @@ function SuperAdmin({ mutate }) {
         <input type="date" value={client.wedding_date} onChange={(event) => setClient({ ...client, wedding_date: event.target.value })} />
         <input type="time" value={client.wedding_time} onChange={(event) => setClient({ ...client, wedding_time: event.target.value })} />
         <input placeholder="Locatie" value={client.venue} onChange={(event) => setClient({ ...client, venue: event.target.value })} />
-        <button type="submit"><Plus size={18} />Client nou</button>
+        <button type="submit"><Plus size={18} />Creeaza nunta</button>
       </form>
       <div className="filter-bar"><label><Search size={16} />Cauta<input placeholder="Client, nunta, locatie" value={search} onChange={(event) => setSearch(event.target.value)} /></label></div>
       <div className="table-wrap">
         <table>
-          <thead><tr><th>Nunta</th><th>Client</th><th>Data</th><th>Invitati</th><th>Uploaduri</th><th>Buget</th><th></th></tr></thead>
+          <thead><tr><th>Nunta</th><th>Client</th><th>Ultima conectare</th><th>Data</th><th>Invitati</th><th>Uploaduri</th><th>Buget</th><th></th></tr></thead>
           <tbody>
             {weddings.map((wedding) => (
               <tr key={wedding.id}>
-                <td><strong>{wedding.couple}</strong><small>{wedding.venue || "-"}</small></td>
+                <td>
+                  <div className="admin-wedding-cell">
+                    {wedding.profile_image_url ? <img src={wedding.profile_image_url} alt={wedding.couple} /> : <img className="admin-logo-fallback" src={appLogo} alt="Gestionare Nunta" />}
+                    <div><strong>{wedding.couple}</strong><small>{wedding.venue || "-"}</small></div>
+                  </div>
+                </td>
                 <td><strong>{wedding.owner_name}</strong><small>{wedding.owner_email}</small></td>
+                <td>{dateTimeLabel(wedding.owner_last_login_at)}</td>
                 <td>{wedding.wedding_date || "-"}</td>
                 <td>{wedding.confirmed}/{wedding.guests}</td>
                 <td>{wedding.uploads} {wedding.newUploads ? <span className="pill yes">{wedding.newUploads} noi</span> : null}</td>
@@ -547,7 +785,6 @@ function SuperAdmin({ mutate }) {
                 <td>
                   <div className="row-actions">
                     <button className="tool-button" onClick={() => mutate(`/api/weddings/${wedding.id}/select`, { method: "POST" })} type="button"><Eye size={17} />Intra</button>
-                    <button className="tool-button" onClick={async () => setAdmin(await api(`/api/admin/users/${wedding.owner_id}/reset-password`, { method: "POST", body: JSON.stringify({ password: "Client123!" }) }))} type="button">Reset</button>
                     <button className="tool-button" onClick={async () => setAdmin(await api(`/api/admin/users/${wedding.owner_id}/status`, { method: "POST", body: JSON.stringify({ status: wedding.status === "inactive" ? "active" : "inactive" }) }))} type="button">{wedding.status === "inactive" ? "Activeaza" : "Dezactiveaza"}</button>
                   </div>
                 </td>
@@ -603,6 +840,21 @@ function ProgressReports({ data }) {
 function ReportBar({ label, value, total, moneyMode = false }) {
   const percent = Math.min(100, Math.round((Number(value || 0) / Math.max(Number(total || 1), 1)) * 100));
   return <article className="report-card"><h3>{label}</h3><div className="bar-track"><span style={{ width: `${percent}%` }} /></div><p><strong>{percent}%</strong><span>{moneyMode ? `${money(value)} / ${money(total)}` : `${value} / ${total}`}</span></p></article>;
+}
+
+function GuestInvitationHub({ data, mutate }) {
+  const [tab, setTab] = useState("guests");
+  const canOpenInvitation = canRole(data.wedding.role, "owner");
+  return (
+    <section className="hub-stack">
+      <div className="segmented section-tabs hub-tabs">
+        <button className={tab === "guests" ? "active" : ""} onClick={() => setTab("guests")} type="button"><Users size={16} />Invitati</button>
+        {canOpenInvitation ? <button className={tab === "invitation" ? "active" : ""} onClick={() => setTab("invitation")} type="button"><FileText size={16} />Invitatie</button> : null}
+      </div>
+      {tab === "guests" ? <Guests data={data} mutate={mutate} embedded /> : null}
+      {tab === "invitation" && canOpenInvitation ? <InvitationSettings data={data} mutate={mutate} embedded /> : null}
+    </section>
+  );
 }
 
 function Guests({ data, mutate }) {
@@ -713,13 +965,13 @@ function Guests({ data, mutate }) {
         </select>
         <button type="submit"><Plus size={18} />Adauga</button>
       </form> : null}
-      <div className="filter-bar">
+      <div className="filter-bar guest-filter-bar">
         <label><Search size={16} />Cauta<input placeholder="Nume sau telefon" value={filters.search} onChange={(event) => { setFilters({ ...filters, search: event.target.value }); setPage(1); }} /></label>
         <label>Status<select value={filters.status} onChange={(event) => { setFilters({ ...filters, status: event.target.value }); setPage(1); }}><option value="all">Toate</option><option>In asteptare</option><option>Confirmat</option><option>Refuzat</option></select></label>
         <label>Masa<select value={filters.table} onChange={(event) => { setFilters({ ...filters, table: event.target.value }); setPage(1); }}><option value="all">Toate</option><option value="none">Fara masa</option>{data.tables.map((table) => <option value={table.id} key={table.id}>{table.name}</option>)}</select></label>
         <button className="tool-button" onClick={exportGuests} type="button"><Download size={16} />Excel</button>
       </div>
-      <div className="table-wrap">
+      <div className="table-wrap guest-table-wrap">
         <table>
           <thead><tr><th>Invitat</th><th>Status</th><th>Locuri</th><th>Meniu</th><th>Masa</th><th>Invitatie</th><th></th></tr></thead>
           <tbody>
@@ -1242,6 +1494,27 @@ function Exports() {
   );
 }
 
+function MediaHub({ data, mutate }) {
+  const [tab, setTab] = useState("qr");
+  async function openPhotos() {
+    setTab("photos");
+    if (data.notifications?.newUploads) await mutate("/api/media-uploads/seen", { method: "POST" });
+  }
+  return (
+    <section className="hub-stack">
+      <div className="segmented section-tabs hub-tabs">
+        <button className={tab === "qr" ? "active" : ""} onClick={() => setTab("qr")} type="button"><QrCode size={16} />QR Media</button>
+        <button className={tab === "photos" ? "active" : ""} onClick={openPhotos} type="button">
+          <Camera size={16} />Poze
+          {data.notifications?.newUploads ? <span className="nav-badge inline-badge">{data.notifications.newUploads}</span> : null}
+        </button>
+      </div>
+      {tab === "qr" ? <MediaQr data={data} /> : null}
+      {tab === "photos" ? <Photos data={data} /> : null}
+    </section>
+  );
+}
+
 function MediaQr({ data }) {
   const [qr, setQr] = useState("");
   useEffect(() => {
@@ -1260,22 +1533,13 @@ function MediaQr({ data }) {
         </div>
       </div>
       <div className="qr-box">{qr ? <img src={qr} alt="QR upload poze si video" /> : <div className="loader" />}</div>
-      <div className="panel">
-        <h3>Pagina publica</h3>
-        <p className="hint">{data.mediaUrl}</p>
-      </div>
     </section>
   );
 }
 
 function Photos({ data }) {
-  const [filters, setFilters] = useState({ search: "", type: "all" });
   const [activeIndex, setActiveIndex] = useState(null);
-  const uploads = data.mediaUploads.filter((upload) => {
-    const matchesText = [upload.file_name, upload.guest_name].join(" ").toLowerCase().includes(filters.search.toLowerCase());
-    const matchesType = filters.type === "all" || (filters.type === "image" ? upload.mime_type.startsWith("image/") : upload.mime_type.startsWith("video/"));
-    return matchesText && matchesType;
-  });
+  const uploads = data.mediaUploads;
   const activeUpload = activeIndex === null ? null : uploads[activeIndex];
   function moveLightbox(delta) {
     setActiveIndex((index) => {
@@ -1290,16 +1554,12 @@ function Photos({ data }) {
         <div><p className="eyebrow">Galerie</p><h2>Poze si video-uri primite</h2></div>
         <a className="tool-button" href="/api/media-uploads/zip"><FileArchive size={17} />Descarca ZIP</a>
       </div>
-      <div className="filter-bar">
-        <label><Search size={16} />Cauta<input placeholder="Fisier sau invitat" value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} /></label>
-        <label>Tip<select value={filters.type} onChange={(event) => setFilters({ ...filters, type: event.target.value })}><option value="all">Toate</option><option value="image">Poze</option><option value="video">Video</option></select></label>
-      </div>
       <div className="photo-grid">
         {data.notifications?.newUploads ? <p className="notification-box"><Bell size={18} />Ai {data.notifications.newUploads} uploaduri noi.</p> : null}
         {uploads.length ? uploads.map((upload, index) => (
           <article className={`photo-tile ${upload.is_new ? "new" : ""}`} key={upload.id}>
             <button className="media-preview" onClick={() => setActiveIndex(index)} type="button">
-              {upload.mime_type.startsWith("image/") ? <img src={upload.url} alt={upload.file_name} /> : <video src={upload.url} />}
+              {upload.mime_type.startsWith("image/") ? <img src={upload.url} alt={upload.file_name} onError={(event) => event.currentTarget.classList.add("media-broken")} /> : <video src={upload.url} />}
             </button>
             <div className="photo-caption">
               <strong>{upload.file_name}</strong>
@@ -1750,7 +2010,7 @@ function TemplateOneInvitation({ data, details, form, heroStyle, locked, mealCho
         </article>
       </section>
 
-      <div className="tpl1-divider"><img src={templateOneIcon} alt="" /></div>
+      <div className="tpl1-divider"><img src={appLogo} alt="" /></div>
 
       <section className="tpl1-section tpl1-section-alt">
         <div className="tpl1-title"><span>Dress code & tematica</span><h2>{wedding.dress_code || "Elegant"}</h2></div>
@@ -1823,7 +2083,7 @@ function MediaUploadPage({ token }) {
   return (
     <main className={`media-public theme-${data.wedding.theme_color || "sage"}`}>
       <section className="media-upload-card">
-        <div className="media-upload-icon"><Camera size={28} /></div>
+        <div className="media-upload-icon"><img src={appLogo} alt="" /></div>
         <p className="eyebrow">Albumul nuntii</p>
         <h1>{data.wedding.couple}</h1>
         <p className="invite-copy">Incarca aici pozele si video-urile tale de la eveniment.</p>

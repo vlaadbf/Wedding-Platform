@@ -13,7 +13,7 @@ const children = commands.map(([name, args]) => {
   const child = spawn(npmCommand, args, {
     cwd: process.cwd(),
     env: process.env,
-    shell: false,
+    shell: process.platform === "win32",
     stdio: ["inherit", "pipe", "pipe"]
   });
 

@@ -88,11 +88,13 @@ function migrate() {
       first_name TEXT,
       last_name TEXT,
       phone TEXT,
+      address TEXT,
       email TEXT NOT NULL UNIQUE,
       password_hash TEXT NOT NULL,
       salt TEXT NOT NULL,
       is_super_admin INTEGER NOT NULL DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'active',
+      last_login_at TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -109,6 +111,7 @@ function migrate() {
       hero_image_url TEXT,
       invite_secondary_image_url TEXT,
       profile_image_url TEXT,
+      onboarding_completed INTEGER NOT NULL DEFAULT 0,
       theme_color TEXT NOT NULL DEFAULT 'sage',
       invitation_template TEXT NOT NULL DEFAULT 'custom',
       brand_name TEXT NOT NULL DEFAULT 'Gestionare Nunta',
@@ -267,10 +270,13 @@ function migrate() {
   addColumn("users", "first_name", "TEXT");
   addColumn("users", "last_name", "TEXT");
   addColumn("users", "phone", "TEXT");
+  addColumn("users", "address", "TEXT");
+  addColumn("users", "last_login_at", "TEXT");
   addColumn("media_uploads", "seen_at", "TEXT");
   addColumn("activity_events", "seen_at", "TEXT");
   addColumn("weddings", "wedding_time", "TEXT");
   addColumn("weddings", "profile_image_url", "TEXT");
+  addColumn("weddings", "onboarding_completed", "INTEGER NOT NULL DEFAULT 0");
   addColumn("weddings", "invite_secondary_image_url", "TEXT");
   addColumn("weddings", "theme_color", "TEXT NOT NULL DEFAULT 'sage'");
   addColumn("weddings", "invitation_template", "TEXT NOT NULL DEFAULT 'custom'");
@@ -733,7 +739,7 @@ function dashboard(wedding, origin, userId = wedding.owner_id) {
 
 function adminDashboard(origin) {
   const weddings = db.prepare(`
-    SELECT weddings.*, users.name AS owner_name, users.email AS owner_email, users.status
+    SELECT weddings.*, users.name AS owner_name, users.email AS owner_email, users.last_login_at AS owner_last_login_at, users.status
     FROM weddings JOIN users ON users.id = weddings.owner_id
     ORDER BY weddings.created_at DESC
   `).all();
@@ -805,8 +811,8 @@ async function handleApi(req, res, url) {
     const email = String(body.email || "").trim().toLowerCase();
     const password = String(body.password || "");
     const passwordError = passwordPolicyError(password);
-    if (!email || !body.couple) {
-      send(res, 422, { message: "Completeaza email, parola si numele mirilor." });
+    if (!email || !body.name) {
+      send(res, 422, { message: "Completeaza numele, emailul si parola." });
       return;
     }
     if (passwordError) {
@@ -825,16 +831,16 @@ async function handleApi(req, res, url) {
     const weddingId = id("wed");
     const { hash, salt } = hashPassword(password);
     db.prepare("INSERT INTO users (id, name, email, password_hash, salt) VALUES (?, ?, ?, ?, ?)")
-      .run(userId, String(body.name || body.couple), email, hash, salt);
+      .run(userId, String(body.name), email, hash, salt);
     db.prepare(`
       INSERT INTO weddings (id, owner_id, couple, wedding_date, venue, venue_address, map_url, dress_code, hero_image_url, invite_intro, program_json, whatsapp_message, media_token)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       weddingId,
       userId,
-      String(body.couple),
-      String(body.wedding_date || ""),
-      String(body.venue || ""),
+      "Nunta ta",
+      "",
+      "",
       "",
       "",
       "Elegant",
@@ -872,6 +878,7 @@ async function handleApi(req, res, url) {
     }
     clearLoginFailures(failureKey);
     logLogin(email, ip, true, "");
+    db.prepare("UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?").run(user.id);
     const active = weddingsForUser(user.id)[0]?.id || null;
     const sessionId = id("ses");
     const csrfToken = token();
@@ -1024,6 +1031,7 @@ async function handleApi(req, res, url) {
   const context = requireWedding(req, res);
   if (!context) return;
   const { session, wedding } = context;
+  const apiPath = url.pathname.replace(/\/+$/, "") || "/";
 
   if (req.method === "GET" && url.pathname === "/api/dashboard") {
     send(res, 200, dashboard(wedding, origin, session.user_id));
@@ -1090,6 +1098,41 @@ async function handleApi(req, res, url) {
     const profileUrl = `/api/public-media/${wedding.id}/profile/${fileName}`;
     db.prepare("UPDATE weddings SET profile_image_url = ? WHERE id = ?").run(profileUrl, wedding.id);
     addAudit(wedding.id, session.user_id, wedding.role, "upload_profile_image", "wedding", profileUrl);
+    send(res, 200, dashboard(parseWedding(db.prepare("SELECT * FROM weddings WHERE id = ?").get(wedding.id)), origin, session.user_id));
+    return;
+  }
+
+  if ((req.method === "POST" || req.method === "PUT") && apiPath === "/api/onboarding") {
+    if (!requireRole(res, wedding, "owner")) return;
+    const body = await readBody(req, 25_000_000);
+    let profileUrl = String(body.profile_image_url || wedding.profile_image_url || "");
+    if (body.profile_data_url) {
+      const upload = safeDataUpload(body.profile_data_url, ["image/"]);
+      if (!upload) return send(res, 422, { message: "Incarca o imagine valida pentru profil." });
+      const ext = mediaExtension(upload.mimeType);
+      const targetDir = join(uploadsDir, wedding.id, "profile");
+      if (!existsSync(targetDir)) mkdirSync(targetDir, { recursive: true });
+      const fileName = `profile_${Date.now()}${ext}`;
+      const filePath = join(targetDir, fileName);
+      await writeFile(filePath, upload.buffer);
+      profileUrl = `/api/public-media/${wedding.id}/profile/${fileName}`;
+    }
+    db.prepare("UPDATE users SET phone = ?, address = ? WHERE id = ?").run(String(body.phone || ""), String(body.address || ""), session.user_id);
+    db.prepare(`
+      UPDATE weddings SET couple = ?, wedding_date = ?, wedding_time = ?, venue = ?, venue_address = ?, map_url = ?, profile_image_url = ?, theme_color = ?, onboarding_completed = 1
+      WHERE id = ?
+    `).run(
+      String(body.couple || wedding.couple || "Nunta"),
+      String(body.wedding_date || ""),
+      String(body.wedding_time || ""),
+      String(body.venue || ""),
+      String(body.venue_address || ""),
+      String(body.map_url || ""),
+      profileUrl,
+      ["sage", "rose", "navy", "dark"].includes(body.theme_color) ? body.theme_color : "sage",
+      wedding.id
+    );
+    addAudit(wedding.id, session.user_id, wedding.role, "complete_onboarding", "wedding", wedding.id);
     send(res, 200, dashboard(parseWedding(db.prepare("SELECT * FROM weddings WHERE id = ?").get(wedding.id)), origin, session.user_id));
     return;
   }
