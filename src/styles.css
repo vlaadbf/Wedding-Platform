@@ -15,6 +15,207 @@
   --shadow: 0 18px 48px rgba(29, 41, 49, 0.08);
 }
 
+/* Dark theme final pass */
+.app-shell.theme-dark {
+  --figma-bg: #0b1114;
+  --figma-panel: #111a1f;
+  --figma-ink: #f4f1e8;
+  --figma-muted: #aab5b5;
+  --figma-line: #25333a;
+  --figma-primary: #d8bd72;
+  --figma-primary-dark: #c69d4f;
+  --figma-sidebar: #0d1519;
+  --figma-soft: #0f181d;
+  --figma-green: #7f9a86;
+  --figma-gold: #d8bd72;
+  --figma-red: #d36d72;
+  --figma-shadow: 0 24px 60px rgba(0, 0, 0, 0.36);
+  color: var(--figma-ink);
+  background:
+    radial-gradient(circle at 80% -10%, rgba(216, 189, 114, 0.09), transparent 34rem),
+    linear-gradient(135deg, #0b1114 0%, #0e171b 58%, #0a1012 100%);
+}
+
+.app-shell.theme-dark .workspace {
+  background:
+    linear-gradient(180deg, rgba(216, 189, 114, 0.025), transparent 340px),
+    var(--figma-bg);
+}
+
+.app-shell.theme-dark .sidebar,
+.app-shell.theme-dark .topbar {
+  color: var(--figma-ink);
+  border-color: var(--figma-line);
+  background: rgba(13, 21, 25, 0.98);
+}
+
+.app-shell.theme-dark .module,
+.app-shell.theme-dark .settings-card,
+.app-shell.theme-dark .settings-card fieldset,
+.app-shell.theme-dark .metric,
+.app-shell.theme-dark .panel,
+.app-shell.theme-dark .report-card,
+.app-shell.theme-dark .table-card,
+.app-shell.theme-dark .table-wrap,
+.app-shell.theme-dark .calendar-day,
+.app-shell.theme-dark .team-form-card,
+.app-shell.theme-dark .team-list article,
+.app-shell.theme-dark .finance-summary article,
+.app-shell.theme-dark .photo-tile,
+.app-shell.theme-dark .qr-box,
+.app-shell.theme-dark .upload-list p,
+.app-shell.theme-dark .profile-menu,
+.app-shell.theme-dark .topbar-results {
+  color: var(--figma-ink);
+  border-color: var(--figma-line);
+  background: var(--figma-panel);
+  box-shadow: none;
+}
+
+.app-shell.theme-dark .settings-page {
+  background:
+    linear-gradient(180deg, rgba(216, 189, 114, 0.035), transparent 180px),
+    #101922;
+}
+
+.app-shell.theme-dark .settings-card {
+  background: #10181d;
+}
+
+.app-shell.theme-dark .settings-card fieldset {
+  background: #0d1715;
+}
+
+.app-shell.theme-dark .platform-preview,
+.app-shell.theme-dark .platform-preview.theme-dark {
+  border-color: var(--figma-line);
+  background: #10181d;
+}
+
+.app-shell.theme-dark .platform-preview aside,
+.app-shell.theme-dark .platform-preview main {
+  color: var(--figma-ink);
+  border-color: var(--figma-line);
+  background: #0d1715;
+}
+
+.app-shell.theme-dark input,
+.app-shell.theme-dark select,
+.app-shell.theme-dark textarea,
+.app-shell.theme-dark .topbar-search,
+.app-shell.theme-dark .filter-bar label,
+.app-shell.theme-dark .file-picker span,
+.app-shell.theme-dark .tool-button,
+.app-shell.theme-dark .ghost-button,
+.app-shell.theme-dark .theme-dots button,
+.app-shell.theme-dark .template-picker button,
+.app-shell.theme-dark .section-tabs button,
+.app-shell.theme-dark .hub-tabs button,
+.app-shell.theme-dark .segmented button,
+.app-shell.theme-dark .mobile-menu-toggle,
+.app-shell.theme-dark .icon-button,
+.app-shell.theme-dark .profile-menu button {
+  color: var(--figma-ink);
+  border-color: var(--figma-line);
+  background: var(--figma-soft);
+}
+
+.app-shell.theme-dark input::placeholder,
+.app-shell.theme-dark textarea::placeholder {
+  color: color-mix(in srgb, var(--figma-muted) 72%, transparent);
+}
+
+.app-shell.theme-dark input:focus,
+.app-shell.theme-dark select:focus,
+.app-shell.theme-dark textarea:focus,
+.app-shell.theme-dark .topbar-search:focus-within {
+  border-color: var(--figma-primary);
+  background: #101c1f;
+  box-shadow: 0 0 0 4px rgba(216, 189, 114, 0.14);
+}
+
+.app-shell.theme-dark .settings-save,
+.app-shell.theme-dark .entry-form button,
+.app-shell.theme-dark .guests-form button,
+.app-shell.theme-dark .budget-form button,
+.app-shell.theme-dark .suppliers-form button,
+.app-shell.theme-dark .task-form button,
+.app-shell.theme-dark .table-form button {
+  color: #12100a;
+  border-color: var(--figma-primary);
+  background: var(--figma-primary);
+}
+
+.app-shell.theme-dark .settings-save:hover,
+.app-shell.theme-dark .entry-form button:hover,
+.app-shell.theme-dark .guests-form button:hover,
+.app-shell.theme-dark .budget-form button:hover,
+.app-shell.theme-dark .suppliers-form button:hover,
+.app-shell.theme-dark .task-form button:hover,
+.app-shell.theme-dark .table-form button:hover {
+  color: #12100a;
+  background: #e5c97f;
+}
+
+.app-shell.theme-dark .sidebar-countdown,
+.app-shell.theme-dark .sidebar-user,
+.app-shell.theme-dark .theme-dots button.selected,
+.app-shell.theme-dark .sidebar nav button.active,
+.app-shell.theme-dark .sidebar nav button:hover {
+  color: #12100a;
+  border-color: rgba(216, 189, 114, 0.55);
+  background: var(--figma-primary);
+}
+
+.app-shell.theme-dark .sidebar nav button {
+  color: #c4cfcc;
+}
+
+.app-shell.theme-dark .sidebar nav button svg {
+  color: currentColor;
+}
+
+.app-shell.theme-dark .sidebar-logout {
+  color: #c4cfcc;
+  border-color: var(--figma-line);
+}
+
+.app-shell.theme-dark .sidebar-logout:hover {
+  color: var(--figma-primary);
+  background: rgba(216, 189, 114, 0.08);
+}
+
+.app-shell.theme-dark .eyebrow,
+.app-shell.theme-dark .settings-card legend,
+.app-shell.theme-dark .brand strong {
+  color: var(--figma-primary);
+}
+
+.app-shell.theme-dark .hint,
+.app-shell.theme-dark .topbar-subtitle,
+.app-shell.theme-dark .brand small,
+.app-shell.theme-dark .metric span,
+.app-shell.theme-dark .metric small,
+.app-shell.theme-dark td small {
+  color: var(--figma-muted);
+}
+
+.app-shell.theme-dark .topbar-search input,
+.app-shell.theme-dark .topbar-search input:focus {
+  color: var(--figma-ink);
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-shell.theme-dark .save-notice,
+.app-shell.theme-dark .notification-box,
+.app-shell.theme-dark .empty-state {
+  color: var(--figma-ink);
+  border-color: rgba(216, 189, 114, 0.28);
+  background: rgba(216, 189, 114, 0.08);
+}
+
+
 .theme-sage {
   --sage: #668a70;
   --sage-dark: #43664d;
@@ -1423,6 +1624,134 @@ td small,
   min-height: 210px;
 }
 
+.dashboard-list-card {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  min-height: 210px;
+  overflow: hidden;
+  border: 1px solid var(--figma-line, var(--line));
+  border-radius: 14px;
+  padding: 18px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--figma-primary, var(--sage)) 7%, transparent), transparent 58%),
+    var(--figma-panel, var(--panel));
+}
+
+.dashboard-list-card::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  content: "";
+  background: var(--figma-primary, var(--sage));
+}
+
+.dashboard-list-card.accent-guests::before {
+  background: var(--figma-green, var(--sage));
+}
+
+.dashboard-list-card.accent-alerts::before {
+  background: var(--figma-red, var(--rose));
+}
+
+.dashboard-list-card.accent-menu::before {
+  background: var(--figma-gold, var(--gold));
+}
+
+.dashboard-list-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dashboard-list-head > span {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--figma-primary-dark, var(--sage-dark));
+  background: color-mix(in srgb, var(--figma-primary, var(--sage)) 13%, white);
+}
+
+.accent-alerts .dashboard-list-head > span {
+  color: var(--figma-red, var(--rose));
+  background: color-mix(in srgb, var(--figma-red, var(--rose)) 12%, white);
+}
+
+.accent-menu .dashboard-list-head > span {
+  color: var(--figma-gold, var(--gold));
+  background: color-mix(in srgb, var(--figma-gold, var(--gold)) 15%, white);
+}
+
+.dashboard-list-head small {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--figma-muted, var(--muted));
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.dashboard-list-head h3 {
+  margin: 0;
+  color: var(--figma-ink, var(--ink));
+  font-size: 18px;
+  line-height: 1.15;
+}
+
+.dashboard-list {
+  display: grid;
+  gap: 8px;
+}
+
+.dashboard-list p {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--figma-line, var(--line)) 75%, transparent);
+  border-radius: 10px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--figma-soft, var(--paper)) 72%, transparent);
+}
+
+.dashboard-list i {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 9px;
+  color: var(--figma-primary-dark, var(--sage-dark));
+  background: color-mix(in srgb, var(--figma-primary, var(--sage)) 13%, white);
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.dashboard-list strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--figma-ink, var(--ink));
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dashboard-list span {
+  min-width: 0;
+  color: var(--figma-muted, var(--muted));
+  font-size: 13px;
+  font-weight: 750;
+  overflow-wrap: anywhere;
+}
+
+.compact-report {
+  min-height: 172px;
+}
+
 .admin-wedding-cell {
   display: flex;
   align-items: center;
@@ -1917,10 +2246,106 @@ tr:last-child td {
 .settings-grid {
   display: grid;
   gap: 14px;
+  align-items: start;
+}
+
+.settings-grid > label {
+  align-content: start;
+  height: 100%;
+}
+
+.settings-grid > label > input,
+.settings-grid > label > select,
+.settings-grid > label > textarea {
+  align-self: start;
 }
 
 .settings-grid.two {
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.settings-grid.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.settings-grid.four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.settings-grid.five {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.color-grid label,
+.compact-inputs label {
+  min-width: 0;
+}
+
+.color-grid input[type="color"] {
+  height: 44px;
+  padding: 4px;
+}
+
+.template-customizer-preview {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  gap: 18px;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid var(--preview-border);
+  border-radius: 16px;
+  padding: 18px;
+  color: var(--preview-text);
+  background: var(--preview-bg);
+}
+
+.template-customizer-preview div {
+  display: grid;
+  gap: 8px;
+  align-content: center;
+  border: 1px solid var(--preview-border);
+  border-radius: 14px;
+  padding: 18px;
+  background: var(--preview-card);
+}
+
+.template-customizer-preview span,
+.template-customizer-preview small {
+  color: var(--preview-muted);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.template-customizer-preview strong {
+  color: var(--preview-text);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(24px, 4vw, 42px);
+  font-weight: 500;
+  line-height: 1.05;
+}
+
+.template-customizer-preview i {
+  border-radius: 999px 999px 18px 18px;
+  background: linear-gradient(160deg, var(--preview-accent), var(--preview-muted));
+}
+
+.template-photo-upload-grid {
+  align-items: start;
+}
+
+.template-photo-field {
+  gap: 8px;
+}
+
+.template-photo-field img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  object-fit: cover;
+  background: var(--soft);
 }
 
 .settings-choice-block {
@@ -2912,8 +3337,8 @@ tr:last-child td {
 
 .tpl1-page {
   min-height: 100vh;
-  color: #222;
-  background: #f8f5e9;
+  color: var(--tpl1-text, #222);
+  background: var(--tpl1-bg, #f8f5e9);
   font-family: "Montserrat", Inter, ui-sans-serif, system-ui, sans-serif;
 }
 
@@ -2942,7 +3367,7 @@ tr:last-child td {
   content: "";
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.32);
+  background: color-mix(in srgb, var(--tpl1-overlay, #1f2524) 34%, transparent);
 }
 
 .tpl1-hero-media,
@@ -2978,6 +3403,7 @@ tr:last-child td {
 
 .tpl1-topline {
   margin-bottom: 12px;
+  color: var(--tpl1-accent, #c89a6a);
 }
 
 .tpl1-countdown {
@@ -3051,11 +3477,11 @@ tr:last-child td {
 
 .tpl1-section {
   padding: 110px 6vw;
-  background: #f8f5e9;
+  background: var(--tpl1-bg, #f8f5e9);
 }
 
 .tpl1-section-alt {
-  background: #eaeaea;
+  background: color-mix(in srgb, var(--tpl1-bg, #f8f5e9) 70%, var(--tpl1-border, #e4cda7));
 }
 
 .tpl1-title {
@@ -3066,7 +3492,7 @@ tr:last-child td {
 .tpl1-title span {
   display: block;
   margin-bottom: 10px;
-  color: #666;
+  color: var(--tpl1-muted, #666);
   font-size: 12px;
   letter-spacing: 0.26em;
   text-transform: uppercase;
@@ -3083,10 +3509,10 @@ tr:last-child td {
 }
 
 .tpl1-card {
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  border: 1px solid var(--tpl1-border, rgba(0, 0, 0, 0.05));
   border-radius: 25px;
   padding: 40px;
-  background: white;
+  background: var(--tpl1-card, white);
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.05);
   text-align: center;
 }
@@ -3104,11 +3530,11 @@ tr:last-child td {
 .tpl1-map {
   display: inline-block;
   margin-top: 10px;
-  border: 1px solid #e4cda7;
+  border: 1px solid var(--tpl1-border, #e4cda7);
   border-radius: 999px;
   padding: 12px 20px;
-  color: #222;
-  background: #f8f5e9;
+  color: var(--tpl1-text, #222);
+  background: var(--tpl1-bg, #f8f5e9);
   font-size: 12px;
   font-weight: 800;
   letter-spacing: 0.12em;
@@ -3120,7 +3546,7 @@ tr:last-child td {
   display: grid;
   place-items: center;
   padding: 34px 0;
-  background: #f8f5e9;
+  background: var(--tpl1-bg, #f8f5e9);
 }
 
 .tpl1-divider img {
@@ -3129,7 +3555,7 @@ tr:last-child td {
   border-radius: 50%;
   object-fit: contain;
   padding: 8px;
-  background: white;
+  background: var(--tpl1-card, white);
   opacity: 0.85;
 }
 
@@ -3153,7 +3579,7 @@ tr:last-child td {
 .tpl1-rsvp-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.56);
+  background: color-mix(in srgb, var(--tpl1-overlay, #1f2524) 58%, transparent);
 }
 
 .tpl1-rsvp-inner {
@@ -3166,8 +3592,8 @@ tr:last-child td {
 .tpl1-rsvp-box {
   border-radius: 24px;
   padding: 42px;
-  color: #222;
-  background: rgba(255, 255, 255, 0.94);
+  color: var(--tpl1-text, #222);
+  background: color-mix(in srgb, var(--tpl1-card, #ffffff) 94%, transparent);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
 }
 
@@ -3178,14 +3604,558 @@ tr:last-child td {
 .tpl1-rsvp-box .rsvp-form button {
   border: 0;
   color: white;
-  background: #c89a6a;
+  background: var(--tpl1-accent, #c89a6a);
 }
 
 .tpl1-footer {
   padding: 34px 20px;
-  color: #666;
-  background: #f8f5e9;
+  color: var(--tpl1-muted, #666);
+  background: var(--tpl1-bg, #f8f5e9);
   text-align: center;
+}
+
+.figma-wedding-page {
+  min-height: 100vh;
+  color: #27231e;
+  background: #f8f2ea;
+}
+
+.figma-landing-hero {
+  position: relative;
+  display: grid;
+  min-height: 100vh;
+  overflow: hidden;
+  padding: clamp(22px, 4vw, 54px);
+  color: #fffaf2;
+  background-position: center;
+  background-size: cover;
+}
+
+.figma-template-media,
+.figma-landing-hero > video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.figma-landing-hero nav,
+.figma-landing-copy {
+  position: relative;
+  z-index: 1;
+}
+
+.figma-landing-hero nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  align-self: start;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.figma-landing-hero nav a,
+.figma-story-section a,
+.simple-wedding-hero a,
+.simple-wedding-card a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  border-radius: 999px;
+  padding: 0 18px;
+  color: #2a231a;
+  background: #f4dba7;
+  font-weight: 850;
+}
+
+.figma-landing-copy {
+  align-self: end;
+  width: min(960px, 100%);
+  padding-bottom: clamp(28px, 8vw, 96px);
+}
+
+.figma-landing-copy p,
+.figma-kicker,
+.simple-wedding-hero p {
+  margin: 0 0 12px;
+  color: #b88f56;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.figma-landing-copy h1 {
+  margin: 0 0 18px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(58px, 12vw, 156px);
+  font-weight: 500;
+  line-height: 0.9;
+}
+
+.figma-landing-copy span {
+  font-size: clamp(18px, 2vw, 28px);
+  font-weight: 800;
+}
+
+.figma-story-section,
+.figma-program-section,
+.figma-rsvp-section,
+.simple-wedding-grid {
+  width: min(1180px, calc(100% - 32px));
+  margin-inline: auto;
+}
+
+.figma-story-section {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(320px, 1fr);
+  gap: clamp(24px, 6vw, 76px);
+  align-items: center;
+  padding: clamp(42px, 8vw, 104px) 0;
+}
+
+.figma-story-section h2,
+.figma-program-section h2,
+.figma-rsvp-section h2,
+.simple-wedding-card h2,
+.simple-rsvp-card h2 {
+  margin: 0 0 18px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(38px, 6vw, 78px);
+  font-weight: 500;
+  line-height: 1;
+}
+
+.figma-story-section article > p:not(.figma-kicker),
+.simple-wedding-card > p:not(.figma-kicker) {
+  color: #685d50;
+  font-size: 18px;
+  line-height: 1.7;
+}
+
+.figma-story-section figure {
+  overflow: hidden;
+  min-height: 560px;
+  margin: 0;
+  border-radius: 46% 46% 10px 10px;
+  background: #e8d7c6;
+}
+
+.figma-story-section img,
+.figma-story-section video,
+.simple-wedding-hero img,
+.simple-wedding-hero video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.figma-program-section {
+  display: grid;
+  grid-template-columns: 0.7fr 1fr;
+  gap: 28px;
+  border-top: 1px solid #d8c8b6;
+  border-bottom: 1px solid #d8c8b6;
+  padding: 54px 0;
+}
+
+.figma-program-section .timeline p,
+.simple-wedding-grid .timeline p {
+  border-color: #d8c8b6;
+}
+
+.figma-rsvp-section {
+  display: grid;
+  grid-template-columns: 0.72fr 1fr;
+  gap: 26px;
+  align-items: start;
+  padding: 64px 0 90px;
+}
+
+.figma-rsvp-section article,
+.simple-rsvp-card,
+.simple-wedding-card,
+.simple-wedding-grid article {
+  border: 1px solid #ddcdbb;
+  border-radius: 22px;
+  padding: clamp(22px, 4vw, 42px);
+  background: rgba(255, 251, 244, 0.92);
+  box-shadow: 0 24px 70px rgba(75, 54, 35, 0.10);
+}
+
+.simple-wedding-page {
+  min-height: 100vh;
+  color: #27231e;
+  background:
+    linear-gradient(90deg, rgba(216, 190, 149, 0.16) 1px, transparent 1px),
+    linear-gradient(rgba(216, 190, 149, 0.16) 1px, transparent 1px),
+    #fbf7ef;
+  background-size: 72px 72px;
+}
+
+.simple-wedding-hero {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(320px, 1.1fr);
+  gap: clamp(24px, 6vw, 76px);
+  align-items: center;
+  width: min(1180px, calc(100% - 32px));
+  min-height: 88vh;
+  margin-inline: auto;
+  padding: clamp(32px, 7vw, 84px) 0;
+}
+
+.simple-wedding-hero h1 {
+  margin: 0 0 20px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(54px, 10vw, 132px);
+  font-weight: 500;
+  line-height: 0.92;
+}
+
+.simple-wedding-hero span {
+  display: block;
+  margin-bottom: 24px;
+  color: #6d6256;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.simple-wedding-hero figure {
+  overflow: hidden;
+  min-height: 620px;
+  margin: 0;
+  border-radius: 28px;
+  box-shadow: 0 30px 90px rgba(75, 54, 35, 0.16);
+}
+
+.simple-wedding-card,
+.simple-rsvp-card {
+  width: min(960px, calc(100% - 32px));
+  margin: 0 auto 28px;
+}
+
+.simple-wedding-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 18px;
+  margin-block: 28px;
+}
+
+.simple-rsvp-card {
+  margin-bottom: 72px;
+}
+
+.figma-wedding-page .rsvp-form button,
+.simple-wedding-page .rsvp-form button {
+  background: #b88f56;
+}
+
+.template2-page {
+  min-height: 100vh;
+  color: var(--t2-text, #343830);
+  background: var(--t2-bg, #f8f8f3);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+}
+
+.template2-hero {
+  position: relative;
+  display: grid;
+  min-height: 640px;
+  overflow: hidden;
+  padding: 22px clamp(18px, 5vw, 70px) 86px;
+  color: var(--t2-text, #30342d);
+  background-position: center;
+  background-size: cover;
+}
+
+.template2-media {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.template2-nav,
+.template2-hero-copy {
+  position: relative;
+  z-index: 2;
+}
+
+.template2-nav {
+  display: grid;
+  grid-template-columns: 80px 1fr 80px;
+  align-items: center;
+  color: color-mix(in srgb, var(--t2-text, #30342d) 82%, transparent);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.template2-nav div {
+  display: flex;
+  justify-content: center;
+  gap: 24px;
+}
+
+.template2-mark {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 18px;
+  text-transform: none;
+}
+
+.template2-nav small {
+  justify-self: end;
+  letter-spacing: 0.12em;
+}
+
+.template2-hero-copy {
+  align-self: center;
+  justify-self: center;
+  width: min(680px, 100%);
+  margin-top: 60px;
+  text-align: center;
+}
+
+.template2-hero-copy p,
+.template2-kicker {
+  margin: 0 0 12px;
+  color: var(--t2-muted, #697060);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.template2-hero-copy h1 {
+  margin: 0 auto 16px;
+  color: var(--t2-text, #30342d);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(42px, 6.6vw, 82px);
+  font-weight: 500;
+  line-height: 0.98;
+}
+
+.template2-hero-copy span {
+  color: var(--t2-muted, #5f665b);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.template2-wave {
+  position: absolute;
+  right: -5%;
+  bottom: -1px;
+  left: -5%;
+  z-index: 1;
+  height: 112px;
+  background: var(--t2-bg, #f8f8f3);
+  clip-path: ellipse(58% 58% at 50% 100%);
+}
+
+.template2-photo-section,
+.template2-featured,
+.template2-services,
+.template2-gallery,
+.template2-contact {
+  width: min(980px, calc(100% - 34px));
+  margin-inline: auto;
+}
+
+.template2-photo-section {
+  margin-top: -44px;
+  padding-bottom: 44px;
+}
+
+.template2-photo-section > .template2-kicker,
+.template2-services > .template2-kicker,
+.template2-gallery > .template2-kicker {
+  text-align: center;
+}
+
+.template2-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+
+.template2-photo-grid figure {
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  margin: 0;
+  border: 1px solid var(--t2-border, #e4e6dc);
+  border-radius: 4px;
+  background: var(--t2-card, #ffffff);
+}
+
+.template2-photo-grid img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.template2-featured {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.9fr) minmax(0, 1.1fr);
+  gap: 34px;
+  align-items: center;
+  padding: 28px 0 46px;
+}
+
+.template2-featured figure {
+  overflow: hidden;
+  height: 360px;
+  margin: 0;
+}
+
+.template2-featured img,
+.template2-featured video,
+.template2-services img,
+.template2-gallery img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.template2-featured article {
+  border: 1px solid var(--t2-border, #e4e6dc);
+  padding: 30px;
+  background: var(--t2-card, #fff);
+}
+
+.template2-featured h2,
+.template2-contact h2 {
+  margin: 0 0 14px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(32px, 5vw, 58px);
+  font-weight: 500;
+}
+
+.template2-featured p {
+  color: var(--t2-muted, #6b7065);
+  line-height: 1.7;
+}
+
+.template2-featured a,
+.template2-contact a {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  margin-top: 10px;
+  border-radius: 999px;
+  padding: 0 16px;
+  color: #ffffff;
+  background: var(--t2-accent, #697060);
+  font-weight: 800;
+}
+
+.template2-services {
+  padding: 20px 0 46px;
+}
+
+.template2-services > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.template2-services article {
+  border: 1px solid var(--t2-border, #e4e6dc);
+  background: var(--t2-card, #ffffff);
+}
+
+.template2-services img {
+  height: 170px;
+}
+
+.template2-services h3 {
+  margin: 0;
+  padding: 16px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 22px;
+  font-weight: 500;
+}
+
+.template2-gallery {
+  padding: 8px 0 54px;
+}
+
+.template2-gallery > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.template2-gallery img {
+  height: 210px;
+}
+
+.template2-testimonial {
+  padding: 54px 18px;
+  color: #f5f4ec;
+  background: var(--t2-band, #555b51);
+  text-align: center;
+}
+
+.template2-testimonial p {
+  margin: 0 0 18px;
+  color: color-mix(in srgb, var(--t2-bg, #f8f8f3) 84%, transparent);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.template2-testimonial blockquote {
+  width: min(820px, 100%);
+  margin: 0 auto 18px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(24px, 4vw, 40px);
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+.template2-contact {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 28px;
+  padding: 48px 0;
+}
+
+.template2-contact article,
+.template2-contact aside {
+  border: 1px solid var(--t2-border, #e4e6dc);
+  padding: 28px;
+  background: var(--t2-card, #ffffff);
+}
+
+.template2-map {
+  display: grid;
+  min-height: 220px;
+  place-items: center;
+  margin-bottom: 18px;
+  color: var(--t2-muted, #6a7065);
+  background:
+    linear-gradient(90deg, rgba(105, 112, 96, .13) 1px, transparent 1px),
+    linear-gradient(rgba(105, 112, 96, .13) 1px, transparent 1px),
+    #eef0e9;
+  background-size: 28px 28px;
+  font-weight: 900;
+}
+
+.template2-contact aside strong,
+.template2-contact aside span {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.template2-contact aside span {
+  color: var(--t2-muted, #6b7065);
 }
 
 .classic-page,
@@ -4220,8 +5190,12 @@ tr:last-child td {
   .register-grid,
   .settings-layout,
   .settings-grid.two,
+  .settings-grid.three,
+  .settings-grid.four,
+  .settings-grid.five,
   .platform-preview,
-  .menu-builder-row {
+  .menu-builder-row,
+  .template-customizer-preview {
     grid-template-columns: 1fr;
   }
 
@@ -4969,3 +5943,1896 @@ tr:last-child td {
     width: 100%;
   }
 }
+
+/* Stack Admin inspired redesign */
+:root {
+  --ink: #17212b;
+  --muted: #748094;
+  --line: #e5eaf1;
+  --paper: #f5f7fb;
+  --panel: #ffffff;
+  --sage: #1f8a70;
+  --sage-dark: #176b57;
+  --rose: #d66a7a;
+  --gold: #c9973f;
+  --cyan: #4f7df3;
+  --danger: #d55858;
+  --positive-bg: #eaf6f1;
+  --positive-text: #1f8a70;
+  --shadow: 0 18px 46px rgba(23, 33, 43, 0.07);
+  --nav: #111827;
+  --nav-soft: #1f2937;
+  --soft-gold: #fff7e6;
+  --soft-blue: color-mix(in srgb, var(--figma-primary) 10%, white);
+  --soft-rose: #fff0f2;
+  --radius-xl: 18px;
+  --radius-md: 12px;
+}
+
+/* Figma transfer layer: Stack Admin light dashboard */
+:root {
+  --figma-bg: #f5f7fb;
+  --figma-panel: #ffffff;
+  --figma-ink: #20232a;
+  --figma-muted: #7a8495;
+  --figma-line: #e5eaf1;
+  --figma-primary: #668a70;
+  --figma-primary-dark: #43664d;
+  --figma-sidebar: #ffffff;
+  --figma-soft: #f8fafc;
+  --figma-green: #668a70;
+  --figma-gold: #b98b42;
+  --figma-red: #b86668;
+  --figma-shadow: 0 10px 28px rgba(25, 36, 51, 0.05);
+  --ink: var(--figma-ink);
+  --muted: var(--figma-muted);
+  --line: var(--figma-line);
+  --paper: var(--figma-bg);
+  --panel: var(--figma-panel);
+  --sage: var(--figma-primary);
+  --sage-dark: var(--figma-primary-dark);
+  --cyan: var(--figma-primary);
+  --gold: var(--figma-gold);
+  --rose: var(--figma-red);
+  --shadow: var(--figma-shadow);
+}
+
+.theme-sage {
+  --figma-primary: #668a70;
+  --figma-primary-dark: #43664d;
+  --figma-green: #668a70;
+  --figma-gold: #b98b42;
+  --figma-red: #b86668;
+  --sage: #668a70;
+  --sage-dark: #43664d;
+  --cyan: #4c8ea3;
+  --gold: #b98b42;
+  --rose: #b86668;
+}
+
+.theme-rose {
+  --figma-primary: #b77982;
+  --figma-primary-dark: #8e4f5b;
+  --figma-green: #b77982;
+  --figma-gold: #c29a58;
+  --figma-red: #b84d5f;
+  --sage: #b77982;
+  --sage-dark: #8e4f5b;
+  --cyan: #7f8f85;
+  --gold: #c29a58;
+  --rose: #b84d5f;
+}
+
+.theme-navy {
+  --figma-primary: #4f6f88;
+  --figma-primary-dark: #263f58;
+  --figma-green: #4f6f88;
+  --figma-gold: #c4a15c;
+  --figma-red: #b86668;
+  --sage: #4f6f88;
+  --sage-dark: #263f58;
+  --cyan: #7397a8;
+  --gold: #c4a15c;
+  --rose: #b86668;
+}
+
+body:has(.app-shell) {
+  color: var(--figma-ink);
+  background: var(--figma-bg);
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  min-height: 100vh;
+  color: var(--figma-ink);
+  background: var(--figma-bg);
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 240px;
+  height: 100vh;
+  overflow: auto;
+  border-right: 1px solid var(--figma-line);
+  padding: 22px 20px;
+  color: var(--figma-ink);
+  background: var(--figma-sidebar);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 42px;
+}
+
+.brand-logo,
+.profile-photo,
+.brand > span {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid var(--figma-line);
+  border-radius: 12px;
+  object-fit: cover;
+  padding: 5px;
+  color: #ffffff;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.profile-photo {
+  padding: 0;
+}
+
+.brand strong {
+  display: block;
+  color: var(--figma-ink);
+  font-size: 16px;
+  line-height: 1.15;
+}
+
+.brand-platform {
+  display: block;
+  color: var(--figma-primary);
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1.05;
+}
+
+.brand-platform + strong {
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.brand small {
+  display: block;
+  color: var(--figma-muted);
+  font-size: 12px;
+}
+
+.sidebar-user {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  border: 1px solid var(--figma-line);
+  border-radius: 12px;
+  padding: 12px;
+  color: var(--figma-ink);
+  background: var(--figma-soft);
+}
+
+.sidebar-user small {
+  color: var(--figma-muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.sidebar-user strong {
+  color: var(--figma-ink);
+  font-size: 13px;
+}
+
+.sidebar-countdown {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--figma-primary) 18%, var(--figma-line));
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: var(--figma-primary-dark);
+  background: color-mix(in srgb, var(--figma-primary) 10%, white);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.sidebar-countdown svg {
+  color: var(--figma-primary);
+}
+
+.sidebar nav {
+  display: grid;
+  gap: 6px;
+  flex: 1;
+  align-content: start;
+}
+
+.sidebar nav button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 42px;
+  border-radius: 8px;
+  padding: 0 14px;
+  color: var(--figma-ink);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.sidebar nav button svg {
+  color: #8b96a9;
+}
+
+.sidebar nav button::before {
+  position: absolute;
+  left: -20px;
+  width: 4px;
+  height: 0;
+  border-radius: 999px;
+  content: "";
+  background: var(--figma-primary);
+  transition: height 0.16s ease;
+}
+
+.sidebar nav button.active,
+.sidebar nav button:hover {
+  color: #ffffff;
+  background: var(--figma-primary);
+}
+
+.sidebar nav button.active::before,
+.sidebar nav button:hover::before {
+  height: 42px;
+}
+
+.sidebar nav button.active svg,
+.sidebar nav button:hover svg {
+  color: #ffffff;
+}
+
+.nav-badge {
+  min-width: 22px;
+  height: 22px;
+  margin-left: auto;
+  color: #ffffff;
+  background: var(--figma-red);
+  font-size: 11px;
+}
+
+.sidebar-logout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 9px;
+  min-height: 42px;
+  margin-top: auto;
+  border: 0;
+  border-top: 1px solid var(--figma-line);
+  border-radius: 0;
+  padding: 16px 12px 0;
+  color: var(--figma-muted);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sidebar-logout:hover {
+  color: var(--figma-primary);
+  background: transparent;
+}
+
+.workspace {
+  min-width: 0;
+  padding: 0 32px 36px;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 70px;
+  margin: 0 -32px 28px;
+  border-bottom: 1px solid var(--figma-line);
+  padding: 0 32px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: none;
+  backdrop-filter: blur(14px);
+}
+
+.topbar .eyebrow {
+  margin: 0 0 3px;
+  color: var(--figma-primary);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.topbar h1 {
+  margin: 0;
+  color: var(--figma-ink);
+  font-size: 22px;
+  line-height: 1.08;
+}
+
+.topbar-subtitle {
+  display: block;
+  margin-top: 4px;
+  color: var(--figma-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.user-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.topbar-search-wrap {
+  position: relative;
+}
+
+.topbar-search {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  width: min(32vw, 340px);
+  min-height: 38px;
+  border: 1px solid var(--figma-line);
+  border-radius: 999px;
+  padding: 0 16px;
+  color: var(--figma-muted);
+  background: var(--figma-bg);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.topbar-search input {
+  width: 100%;
+  min-height: 36px;
+  border: 0;
+  padding: 0;
+  color: var(--figma-ink);
+  background: transparent;
+  box-shadow: none;
+}
+
+.topbar-search input:focus {
+  outline: 0;
+  box-shadow: none;
+}
+
+.topbar-results {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 31;
+  display: grid;
+  gap: 6px;
+  width: min(420px, 82vw);
+  border: 1px solid var(--figma-line);
+  border-radius: 12px;
+  padding: 8px;
+  background: var(--figma-panel);
+  box-shadow: 0 22px 50px rgba(25, 36, 51, 0.14);
+}
+
+.topbar-results button {
+  display: grid;
+  gap: 3px;
+  min-height: 54px;
+  border: 0;
+  border-radius: 9px;
+  padding: 10px 12px;
+  color: var(--figma-ink);
+  background: transparent;
+  text-align: left;
+}
+
+.topbar-results button:hover {
+  background: color-mix(in srgb, var(--figma-primary) 8%, white);
+}
+
+.topbar-results strong {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar-results span,
+.topbar-results p {
+  margin: 0;
+  color: var(--figma-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.topbar-results p {
+  padding: 10px;
+}
+
+.topbar-account {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--figma-primary) 18%, var(--figma-line));
+  border-radius: 50%;
+  color: var(--figma-primary);
+  background: color-mix(in srgb, var(--figma-primary) 12%, white);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.topbar-account:hover,
+.topbar-account:focus-visible {
+  border-color: color-mix(in srgb, var(--figma-primary) 36%, var(--figma-line));
+  outline: 0;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--figma-primary) 13%, transparent);
+}
+
+.profile-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 32px;
+  z-index: 30;
+  display: grid;
+  gap: 8px;
+  width: 240px;
+  border: 1px solid var(--figma-line);
+  border-radius: 12px;
+  padding: 14px;
+  color: var(--figma-ink);
+  background: var(--figma-panel);
+  box-shadow: 0 22px 50px rgba(25, 36, 51, 0.14);
+}
+
+.profile-menu small {
+  color: var(--figma-muted);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.profile-menu strong,
+.profile-menu span {
+  overflow-wrap: anywhere;
+}
+
+.profile-menu span {
+  color: var(--figma-muted);
+  font-size: 12px;
+}
+
+.profile-menu button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  min-height: 36px;
+  border: 1px solid var(--figma-line);
+  border-radius: 8px;
+  padding: 0 10px;
+  color: var(--figma-ink);
+  background: #ffffff;
+  font-weight: 700;
+}
+
+.profile-menu button:hover {
+  color: #ffffff;
+  border-color: var(--figma-primary);
+  background: var(--figma-primary);
+}
+
+.mobile-menu-toggle,
+.icon-button {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--figma-line);
+  border-radius: 10px;
+  color: var(--figma-ink);
+  background: #ffffff;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  margin: 0 0 24px;
+}
+
+.metric,
+.module,
+.task-card,
+.panel,
+.report-card,
+.finance-summary article,
+.team-form-card,
+.settings-card,
+.admin-insight-card,
+.acceptance-strip,
+.qr-box,
+.photo-tile,
+.calendar-day,
+.upload-list p,
+.team-list article,
+.table-wrap {
+  border: 1px solid var(--figma-line);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.metric {
+  position: relative;
+  display: grid;
+  gap: 7px;
+  min-height: 132px;
+  overflow: hidden;
+  padding: 18px;
+}
+
+.metric::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  content: "";
+  background: var(--figma-primary);
+}
+
+.metric:nth-child(2)::before {
+  background: var(--figma-green);
+}
+
+.metric:nth-child(3)::before {
+  background: var(--figma-gold);
+}
+
+.metric:nth-child(4)::before {
+  background: var(--figma-red);
+}
+
+.metric-icon {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 10px;
+  color: var(--figma-primary);
+  background: color-mix(in srgb, var(--figma-primary) 12%, white);
+}
+
+.metric:nth-child(2) .metric-icon {
+  color: var(--figma-green);
+  background: #eaf6f1;
+}
+
+.metric:nth-child(3) .metric-icon {
+  color: var(--figma-gold);
+  background: #fff7e6;
+}
+
+.metric:nth-child(4) .metric-icon {
+  color: var(--figma-red);
+  background: #fff0f2;
+}
+
+.metric span,
+.metric small,
+td small,
+.hint {
+  color: var(--figma-muted);
+}
+
+.metric span,
+.metric small {
+  font-weight: 600;
+}
+
+.metric strong {
+  color: var(--figma-ink);
+  font-size: 28px;
+  line-height: 1.1;
+}
+
+.module {
+  padding: 24px;
+}
+
+.module-title {
+  margin-bottom: 18px;
+}
+
+.module-title h2 {
+  color: var(--figma-ink);
+  font-size: 26px;
+  line-height: 1.12;
+}
+
+.eyebrow {
+  color: var(--figma-primary);
+  letter-spacing: 0;
+}
+
+.entry-form,
+.guests-form,
+.budget-form,
+.suppliers-form,
+.task-form,
+.table-form,
+.admin-client-form {
+  gap: 12px;
+  border: 1px solid var(--figma-line);
+  border-radius: 12px;
+  padding: 16px;
+  background: #ffffff;
+}
+
+input,
+select,
+textarea {
+  border: 1px solid var(--figma-line);
+  border-radius: 8px;
+  color: var(--figma-ink);
+  background: #ffffff;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--figma-primary);
+  outline: 0;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--figma-primary) 12%, transparent);
+}
+
+.entry-form button,
+.guests-form button,
+.budget-form button,
+.suppliers-form button,
+.task-form button,
+.table-form button,
+.settings-save,
+.auth-submit,
+.rsvp-form button,
+.login-form button {
+  color: #ffffff;
+  border-radius: 8px;
+  background: var(--figma-primary);
+  box-shadow: none;
+}
+
+.entry-form button:hover,
+.guests-form button:hover,
+.budget-form button:hover,
+.suppliers-form button:hover,
+.task-form button:hover,
+.table-form button:hover,
+.settings-save:hover,
+.auth-submit:hover,
+.rsvp-form button:hover,
+.login-form button:hover {
+  background: var(--figma-primary-dark);
+}
+
+.tool-button,
+.ghost-button,
+.mini-form button,
+.program-editor button,
+.guest-chip button,
+.menu-builder-row button,
+.menu-option-list button,
+.file-picker span,
+.segmented button,
+.section-tabs button,
+.hub-tabs button,
+.template-picker button,
+.theme-dots button {
+  min-height: 38px;
+  border: 1px solid var(--figma-line);
+  border-radius: 8px;
+  color: var(--figma-ink);
+  background: #ffffff;
+  box-shadow: none;
+}
+
+.tool-button:hover,
+.ghost-button:hover,
+.file-picker span:hover,
+.segmented button:hover,
+.section-tabs button:hover,
+.hub-tabs button:hover,
+.template-picker button:hover,
+.theme-dots button:hover {
+  color: var(--figma-primary);
+  border-color: color-mix(in srgb, var(--figma-primary) 36%, var(--figma-line));
+  background: color-mix(in srgb, var(--figma-primary) 7%, white);
+}
+
+.segmented button.active,
+.section-tabs button.active,
+.hub-tabs button.active {
+  color: #ffffff;
+  border-color: var(--figma-primary);
+  background: var(--figma-primary);
+}
+
+.tool-button.whatsapp {
+  color: #ffffff;
+  border-color: var(--figma-primary);
+  background: var(--figma-primary);
+}
+
+.danger-fill,
+.icon-button.danger {
+  color: #ffffff;
+  border-color: var(--figma-red);
+  background: var(--figma-red);
+}
+
+.filter-bar {
+  gap: 12px;
+  margin: 18px 0;
+}
+
+.filter-bar label {
+  max-width: 320px;
+  border: 1px solid var(--figma-line);
+  border-radius: 8px;
+  padding: 0 12px;
+  color: var(--figma-muted);
+  background: #ffffff;
+}
+
+.filter-bar input,
+.filter-bar select {
+  border: 0;
+  background: transparent;
+}
+
+.table-wrap {
+  overflow: auto;
+  border-radius: 12px;
+}
+
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--figma-line);
+  padding: 14px 16px;
+}
+
+th {
+  color: var(--figma-muted);
+  background: #f8fafc;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+td {
+  color: var(--figma-ink);
+  background: #ffffff;
+}
+
+tr:hover td {
+  background: #f8fbff;
+}
+
+.pill {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--figma-primary) 10%, white);
+}
+
+.pill.yes {
+  color: var(--figma-green);
+  background: #eaf6f1;
+}
+
+.pill.no {
+  color: var(--figma-red);
+  background: #fff0f2;
+}
+
+.admin-insights-grid,
+.admin-snapshot-grid,
+.report-grid {
+  gap: 18px;
+}
+
+.admin-insight-card {
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.mini-bars,
+.bar-track {
+  background: #eef2f7;
+}
+
+.mini-bars span,
+.bar-track span {
+  background: var(--figma-primary);
+}
+
+.seating-layout {
+  gap: 20px;
+}
+
+.table-card {
+  border-radius: 18px;
+}
+
+.table-card header {
+  gap: 16px;
+}
+
+.room-plan {
+  border-radius: 12px;
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--figma-primary) 10%, transparent) 1px, transparent 1px),
+    linear-gradient(color-mix(in srgb, var(--figma-primary) 10%, transparent) 1px, transparent 1px),
+    #ffffff;
+  background-size: 40px 40px;
+}
+
+.photo-grid {
+  gap: 14px;
+}
+
+.photo-tile {
+  overflow: hidden;
+}
+
+.photo-caption {
+  padding: 12px;
+}
+
+.settings-card,
+.team-form-card,
+.settings-card fieldset {
+  border-radius: 12px;
+}
+
+.theme-dots button,
+.template-picker button {
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.theme-dots button.selected,
+.template-picker button.selected {
+  border-color: var(--figma-primary);
+  background: color-mix(in srgb, var(--figma-primary) 10%, white);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--figma-primary) 10%, transparent);
+}
+
+.confirm-dialog,
+.admin-enter-overlay section {
+  border-radius: 16px;
+}
+
+.confirm-dialog .tool-button {
+  border-radius: 8px;
+}
+
+.theme-dark {
+  --figma-bg: #0f1617;
+  --figma-panel: #17212b;
+  --figma-ink: #eef3f0;
+  --figma-muted: #aeb8b5;
+  --figma-line: #2c3637;
+  --figma-primary: #d1b76f;
+  --figma-primary-dark: #e2bd68;
+  --figma-sidebar: #101719;
+  --figma-soft: #11191c;
+  --figma-shadow: 0 18px 46px rgba(0, 0, 0, 0.32);
+}
+
+.theme-dark .sidebar,
+.theme-dark .topbar,
+.theme-dark .metric,
+.theme-dark .module,
+.theme-dark .panel,
+.theme-dark .report-card,
+.theme-dark .table-wrap,
+.theme-dark .calendar-day,
+.theme-dark .settings-card,
+.theme-dark .team-form-card,
+.theme-dark .finance-summary article,
+.theme-dark .photo-tile,
+.theme-dark .qr-box,
+.theme-dark .upload-list p,
+.theme-dark .team-list article,
+.theme-dark td {
+  color: var(--figma-ink);
+  border-color: var(--figma-line);
+  background: var(--figma-panel);
+}
+
+.theme-dark .profile-menu,
+.theme-dark .profile-menu button,
+.theme-dark .topbar-results {
+  color: var(--figma-ink);
+  border-color: var(--figma-line);
+  background: var(--figma-panel);
+}
+
+.theme-dark .topbar-results button:hover {
+  background: var(--figma-soft);
+}
+
+.theme-dark .brand strong,
+.theme-dark td,
+.theme-dark .metric strong,
+.theme-dark .module-title h2 {
+  color: var(--figma-ink);
+}
+
+.theme-dark .brand small,
+.theme-dark .sidebar-user small,
+.theme-dark .metric span,
+.theme-dark .metric small,
+.theme-dark td small,
+.theme-dark .hint {
+  color: var(--figma-muted);
+}
+
+.theme-dark th,
+.theme-dark .entry-form,
+.theme-dark .guests-form,
+.theme-dark .budget-form,
+.theme-dark .suppliers-form,
+.theme-dark .task-form,
+.theme-dark .table-form,
+.theme-dark .admin-client-form,
+.theme-dark input,
+.theme-dark select,
+.theme-dark textarea,
+.theme-dark .tool-button,
+.theme-dark .file-picker span,
+.theme-dark .filter-bar label,
+.theme-dark .topbar-search,
+.theme-dark .topbar-account {
+  color: var(--figma-ink);
+  border-color: var(--figma-line);
+  background: var(--figma-soft);
+}
+
+.theme-dark .sidebar nav button {
+  color: var(--figma-muted);
+}
+
+.theme-dark .sidebar nav button.active,
+.theme-dark .sidebar nav button:hover {
+  color: #111827;
+  background: var(--figma-primary);
+}
+
+@media (max-width: 1100px) {
+  .app-shell {
+    display: block;
+  }
+
+  .workspace {
+    padding: 0 22px 28px;
+  }
+
+  .topbar {
+    margin-inline: -22px;
+    padding-inline: 22px;
+  }
+}
+
+@media (max-width: 700px) {
+  .workspace {
+    padding: 0 14px 22px;
+  }
+
+  .topbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: 74px;
+    margin: 0 -14px 18px;
+    padding: 12px 14px;
+  }
+
+  .topbar h1 {
+    font-size: 24px;
+  }
+
+  .topbar-subtitle {
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .topbar-search,
+  .topbar-search-wrap,
+  .topbar-account,
+  .topbar-results,
+  .profile-menu {
+    display: none;
+  }
+
+  .mobile-menu-toggle {
+    display: inline-grid;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: auto;
+    z-index: 40;
+    width: min(320px, 86vw);
+    height: 100vh;
+    max-height: none;
+    overflow: auto;
+    border-right: 0;
+    border-left: 1px solid var(--figma-line);
+    padding: 20px 18px;
+    box-shadow: -18px 0 44px rgba(25, 36, 51, 0.16);
+    transform: translateX(105%);
+    transition: transform 0.22s ease;
+  }
+
+  .sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  .mobile-menu-close {
+    display: inline-grid;
+    border-radius: 10px;
+    color: var(--figma-ink);
+    border-color: var(--figma-line);
+    background: #ffffff;
+  }
+
+  .metrics-grid,
+  .admin-insights-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .module {
+    padding: 16px;
+  }
+
+  .metric {
+    min-height: 112px;
+    padding: 14px 12px 12px 16px;
+  }
+
+  .metric-icon {
+    width: 34px;
+    height: 34px;
+  }
+
+  .metric strong {
+    font-size: 21px;
+  }
+
+  .photo-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .photo-caption {
+    padding: 8px;
+  }
+
+  .photo-caption strong {
+    font-size: 11px;
+    line-height: 1.2;
+  }
+
+  .photo-caption small,
+  .photo-caption .tool-button {
+    font-size: 10px;
+  }
+}
+
+/* Focused polish: auth links, action buttons, QR media, roles */
+.auth-switch {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  color: var(--muted);
+}
+
+.auth-form .auth-switch button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border: 1px solid color-mix(in srgb, var(--figma-primary) 20%, var(--figma-line));
+  border-radius: 8px;
+  padding: 0 10px;
+  color: var(--figma-primary-dark);
+  background: color-mix(in srgb, var(--figma-primary) 8%, white);
+  font-weight: 900;
+}
+
+.auth-form .auth-switch button:hover,
+.auth-form .auth-switch button:focus-visible {
+  color: #ffffff;
+  border-color: var(--figma-primary);
+  background: var(--figma-primary);
+  outline: 0;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--figma-primary) 14%, transparent);
+}
+
+.entry-form button,
+.settings-save,
+.rsvp-form button,
+.login-form button {
+  min-height: 38px;
+  border: 1px solid var(--figma-primary-dark);
+  border-radius: 8px;
+  padding: 0 14px;
+  color: #ffffff;
+  background: var(--figma-primary-dark);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: none;
+}
+
+.entry-form button:hover,
+.settings-save:hover,
+.rsvp-form button:hover,
+.login-form button:hover {
+  background: color-mix(in srgb, var(--figma-primary-dark) 88%, black);
+  transform: none;
+  box-shadow: none;
+}
+
+.tool-button.whatsapp {
+  min-height: 38px;
+  border-color: #d8e1df;
+  color: var(--figma-ink);
+  background: #ffffff;
+  font-weight: 800;
+}
+
+.tool-button.whatsapp svg {
+  color: #1aa85b;
+}
+
+.tool-button.whatsapp:hover {
+  color: var(--figma-ink);
+  border-color: #bfcfca;
+  background: #f8fbfa;
+}
+
+.tool-button.whatsapp:hover svg {
+  color: #128c4a;
+}
+
+.tool-button,
+.icon-button {
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.row-actions .tool-button {
+  min-height: 36px;
+  padding-inline: 12px;
+  border-color: #dfe6ec;
+  border-radius: 7px;
+  background: #ffffff;
+  white-space: nowrap;
+}
+
+.row-actions .tool-button:hover {
+  color: var(--figma-primary-dark);
+  border-color: color-mix(in srgb, var(--figma-primary) 26%, var(--figma-line));
+  background: #fbfcfd;
+}
+
+.entry-form {
+  align-items: end;
+}
+
+.entry-form button svg,
+.settings-save svg,
+.tool-button svg {
+  flex: 0 0 auto;
+}
+
+.admin-client-form button,
+.guests-form button,
+.table-form button,
+.budget-form button,
+.suppliers-form button,
+.task-form button {
+  min-width: max-content;
+}
+
+.confirm-dialog .danger-fill,
+.confirm-dialog .tool-button.danger-fill {
+  color: #ffffff;
+  border-color: var(--figma-red);
+  background: var(--figma-red);
+}
+
+.confirm-dialog .danger-fill:hover,
+.confirm-dialog .tool-button.danger-fill:hover {
+  color: #ffffff;
+  border-color: color-mix(in srgb, var(--figma-red) 86%, black);
+  background: color-mix(in srgb, var(--figma-red) 86%, black);
+}
+
+.auth-form .auth-switch button,
+.auth-form .auth-switch button:focus,
+.auth-form .auth-switch button:active {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  min-width: 0;
+  min-height: 0;
+  padding: 2px 4px;
+  color: var(--figma-primary-dark) !important;
+  border: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.auth-form .auth-switch button:focus-visible {
+  color: var(--figma-primary-dark) !important;
+  outline: 0;
+  background: color-mix(in srgb, var(--figma-primary) 8%, white) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--figma-primary) 12%, transparent);
+}
+
+.qr-media-section {
+  grid-template-columns: minmax(280px, 0.85fr) minmax(260px, 420px);
+  gap: 24px;
+  align-items: stretch;
+}
+
+.qr-media-intro {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  border: 1px solid var(--figma-line);
+  border-radius: 14px;
+  padding: 24px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--figma-primary) 8%, white), white 62%),
+    #ffffff;
+}
+
+.qr-media-intro h2 {
+  max-width: 560px;
+  font-size: clamp(24px, 3vw, 34px);
+  line-height: 1.12;
+}
+
+.qr-media-intro .hint {
+  max-width: 620px;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.qr-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.qr-actions .tool-button {
+  justify-content: center;
+  min-width: 150px;
+}
+
+.qr-box {
+  min-height: 420px;
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--figma-primary) 8%, white), transparent 13rem),
+    #ffffff;
+}
+
+.qr-box img {
+  width: min(300px, 76%);
+  border: 12px solid #ffffff;
+  border-radius: 18px;
+  box-shadow: 0 18px 40px rgba(25, 36, 51, 0.10);
+}
+
+.team-page {
+  justify-items: stretch;
+}
+
+.team-page .settings-header {
+  width: min(100%, 1040px);
+  margin-inline: auto;
+}
+
+.team-grid {
+  width: min(100%, 1040px);
+  grid-template-columns: minmax(300px, 0.85fr) minmax(320px, 1.15fr);
+  gap: 22px;
+  margin-inline: auto;
+}
+
+.team-form-card {
+  gap: 14px;
+  border-radius: 16px;
+  padding: 22px;
+}
+
+.team-form-card .settings-save {
+  margin-top: 4px;
+}
+
+.team-list {
+  display: grid;
+  gap: 12px;
+}
+
+.team-list article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  border-radius: 16px;
+  padding: 16px;
+}
+
+.team-list article strong {
+  font-size: 16px;
+}
+
+.team-list .row-actions {
+  align-items: center;
+  justify-content: end;
+}
+
+.team-list .pill {
+  min-height: 30px;
+  color: var(--figma-primary-dark);
+  background: color-mix(in srgb, var(--figma-primary) 10%, white);
+}
+
+.team-edit-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+  .qr-media-section,
+  .team-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .qr-box {
+    min-height: 330px;
+  }
+}
+
+@media (max-width: 700px) {
+  .auth-switch {
+    gap: 6px;
+  }
+
+  .auth-form .auth-switch button {
+    min-height: 30px;
+  }
+
+  .qr-media-intro {
+    padding: 18px;
+  }
+
+  .qr-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .team-list article {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .team-list .row-actions {
+    justify-content: start;
+  }
+
+  .team-edit-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .template2-hero {
+    min-height: 540px;
+    padding: 18px 18px 70px;
+  }
+
+  .template2-nav {
+    grid-template-columns: 1fr auto;
+    gap: 14px;
+  }
+
+  .template2-nav div {
+    display: none;
+  }
+
+  .template2-nav small {
+    font-size: 10px;
+  }
+
+  .template2-hero-copy {
+    width: min(430px, 100%);
+    margin-top: 24px;
+  }
+
+  .template2-hero-copy h1 {
+    font-size: clamp(36px, 13vw, 58px);
+  }
+
+  .template2-wave {
+    height: 70px;
+    clip-path: ellipse(76% 62% at 50% 100%);
+  }
+
+  .template2-photo-section,
+  .template2-featured,
+  .template2-services,
+  .template2-gallery,
+  .template2-contact {
+    width: min(100% - 28px, 560px);
+  }
+
+  .template2-photo-section {
+    margin-top: -20px;
+    padding-bottom: 30px;
+  }
+
+  .template2-photo-grid,
+  .template2-services > div,
+  .template2-gallery > div {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .template2-photo-grid figure {
+    aspect-ratio: 1 / 1;
+  }
+
+  .template2-featured,
+  .template2-contact {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .template2-featured {
+    padding-block: 18px 34px;
+  }
+
+  .template2-featured figure {
+    height: 300px;
+  }
+
+  .template2-featured article,
+  .template2-contact article,
+  .template2-contact aside {
+    padding: 20px;
+  }
+
+  .template2-services,
+  .template2-gallery {
+    padding-bottom: 34px;
+  }
+
+  .template2-gallery img {
+    height: 170px;
+  }
+
+  .template2-testimonial {
+    padding: 42px 18px;
+  }
+
+  .template2-contact {
+    padding: 34px 0;
+  }
+
+  .template2-contact .rsvp-form {
+    grid-template-columns: 1fr;
+  }
+
+  .figma-landing-hero {
+    min-height: 86vh;
+    padding: 18px;
+  }
+
+  .figma-landing-hero nav {
+    font-size: 12px;
+  }
+
+  .figma-story-section,
+  .figma-program-section,
+  .figma-rsvp-section,
+  .simple-wedding-hero,
+  .simple-wedding-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .figma-story-section figure,
+  .simple-wedding-hero figure {
+    min-height: 390px;
+  }
+
+  .figma-program-section,
+  .figma-rsvp-section {
+    padding-block: 36px;
+  }
+
+  .simple-wedding-hero {
+    min-height: auto;
+    padding-top: 36px;
+  }
+}
+
+@media (max-width: 520px) {
+  .template2-hero {
+    min-height: 500px;
+  }
+
+  .template2-photo-grid,
+  .template2-services > div,
+  .template2-gallery > div {
+    grid-template-columns: 1fr;
+  }
+
+  .template2-services img,
+  .template2-gallery img {
+    height: 220px;
+  }
+}
+
+/* Final dark theme cleanup: keep this at the end of the file. */
+.app-shell.theme-dark {
+  --figma-bg: #0b1114;
+  --figma-panel: #111a1f;
+  --figma-ink: #f4f1e8;
+  --figma-muted: #aab5b5;
+  --figma-line: #25333a;
+  --figma-primary: #d8bd72;
+  --figma-primary-dark: #c69d4f;
+  --figma-sidebar: #0d1519;
+  --figma-soft: #0f181d;
+  --figma-green: #7f9a86;
+  --figma-gold: #d8bd72;
+  --figma-red: #d36d72;
+  color: var(--figma-ink);
+  background:
+    radial-gradient(circle at 84% -12%, rgba(216, 189, 114, 0.10), transparent 34rem),
+    linear-gradient(135deg, #0b1114 0%, #0e171b 58%, #0a1012 100%);
+}
+
+.app-shell.theme-dark .workspace {
+  background:
+    linear-gradient(180deg, rgba(216, 189, 114, 0.035), transparent 360px),
+    var(--figma-bg);
+}
+
+.app-shell.theme-dark .sidebar,
+.app-shell.theme-dark .topbar {
+  color: var(--figma-ink);
+  border-color: var(--figma-line);
+  background: var(--figma-sidebar);
+}
+
+.app-shell.theme-dark .module,
+.app-shell.theme-dark .metric,
+.app-shell.theme-dark .panel,
+.app-shell.theme-dark .report-card,
+.app-shell.theme-dark .admin-insight-card,
+.app-shell.theme-dark .admin-list-card,
+.app-shell.theme-dark .admin-control-panel,
+.app-shell.theme-dark .acceptance-strip,
+.app-shell.theme-dark .acceptance-list article,
+.app-shell.theme-dark .settings-card,
+.app-shell.theme-dark .settings-card fieldset,
+.app-shell.theme-dark .team-form-card,
+.app-shell.theme-dark .team-list article,
+.app-shell.theme-dark .finance-summary article,
+.app-shell.theme-dark .table-wrap,
+.app-shell.theme-dark .table-card,
+.app-shell.theme-dark .guest-chip,
+.app-shell.theme-dark .room-plan,
+.app-shell.theme-dark .calendar-day,
+.app-shell.theme-dark .photo-tile,
+.app-shell.theme-dark .qr-media-intro,
+.app-shell.theme-dark .qr-box,
+.app-shell.theme-dark .upload-list p,
+.app-shell.theme-dark .profile-menu,
+.app-shell.theme-dark .topbar-results,
+.app-shell.theme-dark .entry-form,
+.app-shell.theme-dark .guests-form,
+.app-shell.theme-dark .budget-form,
+.app-shell.theme-dark .suppliers-form,
+.app-shell.theme-dark .task-form,
+.app-shell.theme-dark .table-form,
+.app-shell.theme-dark .admin-client-form,
+.app-shell.theme-dark .inline-edit-form,
+.app-shell.theme-dark .edit-row td {
+  color: var(--figma-ink);
+  border-color: var(--figma-line);
+  background: var(--figma-panel);
+  box-shadow: none;
+}
+
+.app-shell.theme-dark .settings-page,
+.app-shell.theme-dark .photo-page {
+  background:
+    linear-gradient(180deg, rgba(216, 189, 114, 0.035), transparent 180px),
+    var(--figma-bg);
+}
+
+.app-shell.theme-dark .qr-media-intro {
+  background:
+    linear-gradient(135deg, rgba(216, 189, 114, 0.08), rgba(17, 26, 31, 0.88) 54%),
+    var(--figma-panel);
+}
+
+.app-shell.theme-dark .qr-box {
+  background:
+    radial-gradient(circle at 50% 42%, rgba(216, 189, 114, 0.09), transparent 13rem),
+    #0f181d;
+}
+
+.app-shell.theme-dark .qr-box img {
+  border-color: #f7f3e8;
+  background: #ffffff;
+}
+
+.app-shell.theme-dark .platform-preview,
+.app-shell.theme-dark .platform-preview.theme-dark {
+  color: var(--figma-ink);
+  border-color: var(--figma-line);
+  background: #10181d;
+}
+
+.app-shell.theme-dark .platform-preview aside,
+.app-shell.theme-dark .platform-preview main {
+  color: var(--figma-ink);
+  border-color: var(--figma-line);
+  background: #0d1715;
+}
+
+.app-shell.theme-dark input,
+.app-shell.theme-dark select,
+.app-shell.theme-dark textarea,
+.app-shell.theme-dark .topbar-search,
+.app-shell.theme-dark .filter-bar label,
+.app-shell.theme-dark .guest-filter-bar,
+.app-shell.theme-dark .file-picker span,
+.app-shell.theme-dark .tool-button,
+.app-shell.theme-dark .ghost-button,
+.app-shell.theme-dark .theme-dots button,
+.app-shell.theme-dark .template-picker button,
+.app-shell.theme-dark .section-tabs button,
+.app-shell.theme-dark .hub-tabs button,
+.app-shell.theme-dark .segmented button,
+.app-shell.theme-dark .mobile-menu-toggle,
+.app-shell.theme-dark .icon-button,
+.app-shell.theme-dark .profile-menu button,
+.app-shell.theme-dark .menu-builder-row button,
+.app-shell.theme-dark .menu-option-list button,
+.app-shell.theme-dark .guest-chip button {
+  color: var(--figma-ink);
+  border-color: var(--figma-line);
+  background: var(--figma-soft);
+}
+
+.app-shell.theme-dark input::placeholder,
+.app-shell.theme-dark textarea::placeholder {
+  color: color-mix(in srgb, var(--figma-muted) 72%, transparent);
+}
+
+.app-shell.theme-dark input:focus,
+.app-shell.theme-dark select:focus,
+.app-shell.theme-dark textarea:focus,
+.app-shell.theme-dark .topbar-search:focus-within {
+  color: var(--figma-ink);
+  border-color: var(--figma-primary);
+  background: #101c1f;
+  box-shadow: 0 0 0 4px rgba(216, 189, 114, 0.14);
+}
+
+.app-shell.theme-dark .settings-save,
+.app-shell.theme-dark .entry-form button,
+.app-shell.theme-dark .guests-form button,
+.app-shell.theme-dark .budget-form button,
+.app-shell.theme-dark .suppliers-form button,
+.app-shell.theme-dark .task-form button,
+.app-shell.theme-dark .table-form button,
+.app-shell.theme-dark .admin-client-form button {
+  color: #12100a;
+  border-color: var(--figma-primary);
+  background: var(--figma-primary);
+}
+
+.app-shell.theme-dark .settings-save:hover,
+.app-shell.theme-dark .entry-form button:hover,
+.app-shell.theme-dark .guests-form button:hover,
+.app-shell.theme-dark .budget-form button:hover,
+.app-shell.theme-dark .suppliers-form button:hover,
+.app-shell.theme-dark .task-form button:hover,
+.app-shell.theme-dark .table-form button:hover,
+.app-shell.theme-dark .admin-client-form button:hover {
+  color: #12100a;
+  background: #e5c97f;
+}
+
+.app-shell.theme-dark .sidebar-countdown,
+.app-shell.theme-dark .sidebar-user,
+.app-shell.theme-dark .theme-dots button.selected,
+.app-shell.theme-dark .sidebar nav button.active,
+.app-shell.theme-dark .sidebar nav button:hover,
+.app-shell.theme-dark .hub-tabs button.active,
+.app-shell.theme-dark .section-tabs button.active,
+.app-shell.theme-dark .segmented button.active {
+  color: #12100a;
+  border-color: rgba(216, 189, 114, 0.62);
+  background: var(--figma-primary);
+}
+
+.app-shell.theme-dark .sidebar nav button,
+.app-shell.theme-dark .sidebar-logout {
+  color: #c4cfcc;
+}
+
+.app-shell.theme-dark .sidebar-logout {
+  border-color: var(--figma-line);
+}
+
+.app-shell.theme-dark .sidebar-logout:hover {
+  color: var(--figma-primary);
+  background: rgba(216, 189, 114, 0.08);
+}
+
+.app-shell.theme-dark .eyebrow,
+.app-shell.theme-dark .settings-card legend,
+.app-shell.theme-dark .brand strong,
+.app-shell.theme-dark .brand-platform,
+.app-shell.theme-dark .module-title h2,
+.app-shell.theme-dark .metric strong,
+.app-shell.theme-dark .qr-media-intro h2,
+.app-shell.theme-dark .photo-caption strong,
+.app-shell.theme-dark .team-list article strong,
+.app-shell.theme-dark td {
+  color: var(--figma-ink);
+}
+
+.app-shell.theme-dark .eyebrow,
+.app-shell.theme-dark .settings-card legend,
+.app-shell.theme-dark .brand-platform {
+  color: var(--figma-primary);
+}
+
+.app-shell.theme-dark .hint,
+.app-shell.theme-dark .topbar-subtitle,
+.app-shell.theme-dark .brand small,
+.app-shell.theme-dark .metric span,
+.app-shell.theme-dark .metric small,
+.app-shell.theme-dark td small,
+.app-shell.theme-dark .photo-caption small,
+.app-shell.theme-dark .qr-media-intro .hint {
+  color: var(--figma-muted);
+}
+
+.app-shell.theme-dark .topbar-search input,
+.app-shell.theme-dark .topbar-search input:focus {
+  color: var(--figma-ink);
+  background: transparent;
+  box-shadow: none;
+}
+
+.app-shell.theme-dark .save-notice,
+.app-shell.theme-dark .notification-box,
+.app-shell.theme-dark .empty-state,
+.app-shell.theme-dark .pill,
+.app-shell.theme-dark .plus-badge {
+  color: var(--figma-ink);
+  border-color: rgba(216, 189, 114, 0.28);
+  background: rgba(216, 189, 114, 0.10);
+}
+
+.app-shell.theme-dark .segmented,
+.app-shell.theme-dark .section-tabs,
+.app-shell.theme-dark .hub-tabs {
+  border-color: var(--figma-line) !important;
+  background: var(--figma-soft) !important;
+}
+
+.app-shell.theme-dark .row-actions .tool-button:hover,
+.app-shell.theme-dark .tool-button:hover,
+.app-shell.theme-dark .ghost-button:hover,
+.app-shell.theme-dark .file-picker span:hover {
+  color: var(--figma-primary);
+  border-color: rgba(216, 189, 114, 0.45);
+  background: rgba(216, 189, 114, 0.08);
+}
+
+.app-shell.theme-dark .dashboard-list-card {
+  color: var(--figma-ink);
+  border-color: var(--figma-line);
+  background:
+    linear-gradient(135deg, rgba(216, 189, 114, 0.055), transparent 62%),
+    #10191e;
+}
+
+.app-shell.theme-dark .dashboard-list-head > span,
+.app-shell.theme-dark .dashboard-list i {
+  color: #12100a;
+  background: var(--figma-primary);
+}
+
+.app-shell.theme-dark .accent-alerts .dashboard-list-head > span {
+  color: #fff7f3;
+  background: var(--figma-red);
+}
+
+.app-shell.theme-dark .accent-menu .dashboard-list-head > span {
+  color: #12100a;
+  background: var(--figma-gold);
+}
+
+.app-shell.theme-dark .dashboard-list p {
+  border-color: rgba(216, 189, 114, 0.16);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.app-shell.theme-dark .dashboard-list-head h3,
+.app-shell.theme-dark .dashboard-list strong {
+  color: var(--figma-ink);
+}
+
+.app-shell.theme-dark .dashboard-list-head small,
+.app-shell.theme-dark .dashboard-list span {
+  color: var(--figma-muted);
+}
+
+
+

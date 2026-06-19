@@ -47,7 +47,7 @@ const emptyGuest = {
   phone: "",
   side: "Comun",
   group_name: "",
-  status: "In asteptare",
+  status: "În așteptare",
   meal_choice: "",
   allergies: "",
   seats: 1,
@@ -59,11 +59,11 @@ function splitGuestName(name = "") {
   return { first_name: firstName || "", last_name: rest.join(" ") };
 }
 
-function prettyFileLabel(files, fallback = "Alege fisiere") {
+function prettyFileLabel(files, fallback = "Alege fișiere") {
   const list = Array.from(files || []);
   if (!list.length) return fallback;
   if (list.length === 1) return list[0].name;
-  return `${list.length} fisiere selectate`;
+  return `${list.length} fișiere selectate`;
 }
 
 function normalizeSeatCount(value) {
@@ -96,8 +96,67 @@ function canRole(role, required) {
 }
 
 const invitationTemplates = [
-  { key: "custom", title: "Template 1", description: "Layout cu 2 media, RSVP si program", resolution: "1920x1080 px", secondaryResolution: "1200x900 px", icon: appLogo }
+  { key: "custom", title: "Template 1", description: "Layout cu 2 media, RSVP și program", resolution: "1920x1080 px", secondaryResolution: "1200x900 px", icon: appLogo },
+  { key: "figma-landing", title: "Template 2", description: "Landing page stil Italia, cu galerie și RSVP", resolution: "1920x1080 px", secondaryResolution: "1400x1000 px", icon: appLogo }
 ];
+
+const template1Defaults = {
+  background: "#fffaf2",
+  text: "#1f2524",
+  muted: "#756b5d",
+  accent: "#c49345",
+  card: "#ffffff",
+  border: "#eadcc8",
+  darkOverlay: "#1f2524",
+  heroKicker: "Save the date",
+  scrollText: "Scroll",
+  detailsKicker: "Invitație",
+  detailsTitle: "Ziua noastră specială",
+  mapButton: "Vezi locația pe Google Maps",
+  dressKicker: "Dress code & tematică",
+  dressTitle: "Elegant",
+  programTitle: "Program",
+  dressText: "Ținută elegantă, potrivită pentru seară.",
+  rsvpKicker: "RSVP",
+  rsvpTitle: "Confirmă prezența",
+  footerText: "Cu drag"
+};
+
+const template2Defaults = {
+  background: "#f8f8f3",
+  text: "#30342d",
+  muted: "#697060",
+  accent: "#697060",
+  darkBand: "#555b51",
+  card: "#ffffff",
+  border: "#e4e6dc",
+  heroKicker: "Romantic wedding venue",
+  heroTitle: "Discover your perfect Italian wedding venue",
+  photosTitle: "Galerie foto",
+  photoOne: "",
+  photoTwo: "",
+  photoThree: "",
+  photoFour: "",
+  photoFive: "",
+  venueKicker: "Featured venue",
+  servicesTitle: "Services",
+  serviceOne: "Ceremony",
+  serviceTwo: "Dinner",
+  serviceThree: "Wedding day",
+  galleryTitle: "Our portfolio",
+  testimonialKicker: "Testimonials",
+  testimonialText: "O zi elegantă, caldă și atent organizată. Abia așteptăm să sărbătorim împreună cu voi.",
+  rsvpKicker: "RSVP",
+  rsvpTitle: "Confirmă prezența"
+};
+
+function template2Design(wedding = {}) {
+  return { ...template2Defaults, ...(wedding.invitation_design || {}) };
+}
+
+function template1Design(wedding = {}) {
+  return { ...template1Defaults, ...(wedding.invitation_design || {}) };
+}
 
 async function api(path, options = {}) {
   const csrfToken = document.cookie.split("; ").find((item) => item.startsWith("csrf_token="))?.split("=")[1] || "";
@@ -107,7 +166,7 @@ async function api(path, options = {}) {
     ...options
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.message || "Cererea a esuat.");
+  if (!response.ok) throw new Error(data.message || "Cererea a eșuat.");
   return data;
 }
 
@@ -147,12 +206,12 @@ function Countdown({ wedding }) {
     return () => window.clearInterval(timer);
   }, []);
   const target = weddingDateTime(wedding);
-  if (!target) return <Metric icon={<Clock />} label="Pana la nunta" value="-" detail="seteaza data si ora" />;
+  if (!target) return <Metric icon={<Clock />} label="Până la nuntă" value="-" detail="setează data și ora" />;
   const diff = Math.max(0, target.getTime() - now);
   const days = Math.floor(diff / 86400000);
   const hours = Math.floor((diff % 86400000) / 3600000);
   const minutes = Math.floor((diff % 3600000) / 60000);
-  return <Metric icon={<Clock />} label="Pana la nunta" value={`${days}z ${hours}h`} detail={`${minutes} minute ramase`} />;
+  return <Metric icon={<Clock />} label="Până la nuntă" value={`${days}z ${hours}h`} detail={`${minutes} minute rămase`} />;
 }
 
 function SidebarCountdown({ wedding }) {
@@ -162,7 +221,7 @@ function SidebarCountdown({ wedding }) {
     return () => window.clearInterval(timer);
   }, []);
   const target = weddingDateTime(wedding);
-  if (!target) return <p className="sidebar-countdown"><Clock size={16} />Seteaza data si ora nuntii</p>;
+  if (!target) return <p className="sidebar-countdown"><Clock size={16} />Setează data și ora nunții</p>;
   const diff = Math.max(0, target.getTime() - now);
   const days = Math.floor(diff / 86400000);
   const hours = Math.floor((diff % 86400000) / 3600000);
@@ -200,17 +259,17 @@ function App() {
 }
 
 function ScreenLoader() {
-  return <main className="center-screen"><div className="wedding-loader"><img src={appLogo} alt="" /> <strong>Se incarca platforma</strong></div></main>;
+  return <main className="center-screen"><div className="wedding-loader"><img src={appLogo} alt="" /> <strong>Se încarcă platforma</strong></div></main>;
 }
 
-function ConfirmDialog({ title = "Esti sigur?", message, confirmLabel = "Sterge", onCancel, onConfirm }) {
+function ConfirmDialog({ title = "Ești sigur?", message, confirmLabel = "Șterge", onCancel, onConfirm }) {
   return (
     <div className="confirm-backdrop" role="dialog" aria-modal="true">
       <section className="confirm-dialog">
         <h2>{title}</h2>
         <p>{message}</p>
         <div className="row-actions">
-          <button className="tool-button" onClick={onCancel} type="button">Anuleaza</button>
+          <button className="tool-button" onClick={onCancel} type="button">Anulează</button>
           <button className="tool-button danger-fill" onClick={onConfirm} type="button">{confirmLabel}</button>
         </div>
       </section>
@@ -234,8 +293,8 @@ function AuthMotion({ type, message }) {
           {isSuccess
             ? "Contul a fost creat. Revenim automat la conectare."
             : isRegister
-              ? "Validam datele, cream nunta si pregatim contul."
-              : "Verificam sesiunea si pregatim panoul tau."}
+              ? "Validăm datele, creăm nunta și pregătim contul."
+              : "Verificăm sesiunea și pregătim panoul tău."}
         </p>
       </div>
       <div className="auth-progress" aria-hidden="true"><span /></div>
@@ -278,7 +337,7 @@ function AuthScreen({ onAuth }) {
     try {
       await api("/api/login", { method: "POST", body: JSON.stringify(login) });
       const session = await api("/api/session");
-      setLoadingMessage("Se incarca platforma...");
+      setLoadingMessage("Se încarcă platforma...");
       window.setTimeout(() => onAuth(session), 700);
     } catch (err) {
       setLoadingMessage("");
@@ -312,30 +371,30 @@ function AuthScreen({ onAuth }) {
         <div className="auth-card-head">
           <div className="auth-card-icon"><img src={appLogo} alt="Gestionare Nunta" /></div>
           <p className="eyebrow">Platforma pentru miri</p>
-          <h1>{mode === "login" ? "Autentificare" : "Inregistrare"}</h1>
-          {mode === "login" ? <p>Bine ai revenit. Conecteaza-te ca sa continui organizarea.</p> : null}
+          <h1>{mode === "login" ? "Autentificare" : "Înregistrare"}</h1>
+          {mode === "login" ? <p>Bine ai revenit. Conectează-te ca să continui organizarea.</p> : null}
         </div>
         {loadingMessage ? <AuthMotion type={mode} message={loadingMessage} /> : null}
         {successMessage ? <AuthMotion type="success" message={successMessage} /> : null}
         {mode === "login" ? (
           <form className="login-form auth-form" onSubmit={submitLogin}>
             <label>Email<span className="auth-input"><Mail size={19} /><input placeholder="exemplu@email.com" value={login.email} onChange={(event) => setLogin({ ...login, email: event.target.value })} /></span></label>
-            <label>Parola<span className="auth-input"><LockKeyhole size={19} /><input placeholder="Parola contului" type={showLoginPassword ? "text" : "password"} value={login.password} onChange={(event) => setLogin({ ...login, password: event.target.value })} /><button className="password-toggle" type="button" aria-label={showLoginPassword ? "Ascunde parola" : "Arata parola"} onClick={() => setShowLoginPassword(!showLoginPassword)}>{showLoginPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></span></label>
-            <div className="auth-options"><label><input type="checkbox" />Tine-ma minte</label></div>
+            <label>Parola<span className="auth-input"><LockKeyhole size={19} /><input placeholder="Parola contului" type={showLoginPassword ? "text" : "password"} value={login.password} onChange={(event) => setLogin({ ...login, password: event.target.value })} /><button className="password-toggle" type="button" aria-label={showLoginPassword ? "Ascunde parola" : "Arată parola"} onClick={() => setShowLoginPassword(!showLoginPassword)}>{showLoginPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></span></label>
+            <div className="auth-options"><label><input type="checkbox" />Ține-mă minte</label></div>
             {error ? <p className="form-error">{error}</p> : null}
-            <button className="auth-submit" disabled={Boolean(loadingMessage)} type="submit">Conecteaza-te</button>
+            <button className="auth-submit" disabled={Boolean(loadingMessage)} type="submit">Conectează-te</button>
             <div className="auth-divider"><span />sau<span /></div>
-            <p className="auth-switch">Nu ai cont? <button onClick={() => { setMode("register"); setError(""); setSuccessMessage(""); }} type="button">Inregistreaza-te</button></p>
+            <p className="auth-switch">Nu ai cont? <button onClick={() => { setMode("register"); setError(""); setSuccessMessage(""); }} type="button">Înregistrează-te</button></p>
           </form>
         ) : (
           <form className="login-form auth-form" onSubmit={submitRegister}>
-            <label>Nume cont<span className="auth-input"><User size={19} /><input required placeholder="Numele tau complet" value={register.name} onChange={(event) => setRegister({ ...register, name: event.target.value })} /></span></label>
+            <label>Nume cont<span className="auth-input"><User size={19} /><input required placeholder="Numele tău complet" value={register.name} onChange={(event) => setRegister({ ...register, name: event.target.value })} /></span></label>
             <label>Email<span className="auth-input"><Mail size={19} /><input required placeholder="exemplu@email.com" type="email" value={register.email} onChange={(event) => setRegister({ ...register, email: event.target.value })} /></span></label>
-            <label>Parola<span className="auth-input"><LockKeyhole size={19} /><input required placeholder="Minim 10 caractere" type={showRegisterPassword ? "text" : "password"} minLength="10" value={register.password} onChange={(event) => setRegister({ ...register, password: event.target.value })} /><button className="password-toggle" type="button" aria-label={showRegisterPassword ? "Ascunde parola" : "Arata parola"} onClick={() => setShowRegisterPassword(!showRegisterPassword)}>{showRegisterPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></span><span className="field-hint">Litera mare, cifra si simbol.</span></label>
+            <label>Parola<span className="auth-input"><LockKeyhole size={19} /><input required placeholder="Minim 10 caractere" type={showRegisterPassword ? "text" : "password"} minLength="10" value={register.password} onChange={(event) => setRegister({ ...register, password: event.target.value })} /><button className="password-toggle" type="button" aria-label={showRegisterPassword ? "Ascunde parola" : "Arată parola"} onClick={() => setShowRegisterPassword(!showRegisterPassword)}>{showRegisterPassword ? <EyeOff size={18} /> : <Eye size={18} />}</button></span><span className="field-hint">Literă mare, cifră și simbol.</span></label>
             {error ? <p className="form-error span-2">{error}</p> : null}
-            <button className="auth-submit" disabled={Boolean(loadingMessage)} type="submit">Creeaza cont</button>
+            <button className="auth-submit" disabled={Boolean(loadingMessage)} type="submit">Creează cont</button>
             <div className="auth-divider"><span />sau<span /></div>
-            <p className="auth-switch">Ai deja cont? <button onClick={() => { setMode("login"); setError(""); setSuccessMessage(""); }} type="button">Autentifica-te</button></p>
+            <p className="auth-switch">Ai deja cont? <button onClick={() => { setMode("login"); setError(""); setSuccessMessage(""); }} type="button">Autentifică-te</button></p>
           </form>
         )}
       </section>
@@ -345,10 +404,12 @@ function AuthScreen({ onAuth }) {
 
 function Dashboard({ session, onLogout }) {
   const [data, setData] = useState(null);
-  const [active, setActive] = useState("guests");
+  const [active, setActive] = useState(session.user.isSuperAdmin ? "admin" : "guests");
   const [error, setError] = useState("");
   const [logoutConfirm, setLogoutConfirm] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [topbarSearch, setTopbarSearch] = useState("");
+  const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => { refresh(); }, []);
   useEffect(() => {
@@ -362,14 +423,41 @@ function Dashboard({ session, onLogout }) {
     try {
       setData(await api("/api/dashboard"));
     } catch (err) {
-      setError(err.message);
+      if (session.user.isSuperAdmin) {
+        setData({
+          wedding: {
+            id: "super-admin",
+            couple: "Super Admin",
+            venue: "Platforma",
+            role: "super_admin",
+            theme_color: "sage",
+            onboarding_completed: 1
+          },
+          weddings: [],
+          guests: [],
+          tables: [],
+          suppliers: [],
+          budget: [],
+          tasks: [],
+          roomTables: [],
+          team: [],
+          mediaUploads: [],
+          notifications: { newAcceptances: 0, newUploads: 0, openTasks: 0, duePayments: 0 },
+          mediaUrl: ""
+        });
+        setActive("admin");
+      } else {
+        setError(err.message);
+      }
     }
   }
 
   async function mutate(path, options) {
     setError("");
     try {
-      setData(await api(path, options));
+      const nextData = await api(path, options);
+      setData(nextData);
+      if (path.includes("/api/weddings/") && path.endsWith("/select")) setActive("progress");
       return true;
     } catch (err) {
       setError(err.message);
@@ -385,6 +473,14 @@ function Dashboard({ session, onLogout }) {
     }
   }
 
+  function applyTopbarSearch(value) {
+    setTopbarSearch(value);
+    if (!value.trim()) return;
+    if (active === "progress" || active === "exports" || active === "settings" || active === "team") {
+      setActive(session.user.isSuperAdmin ? "admin" : "guests");
+    }
+  }
+
   if (!data) return <ScreenLoader />;
   if (canRole(data.wedding.role, "owner") && !session.user.isSuperAdmin && !Number(data.wedding.onboarding_completed || 0)) {
     return <OnboardingWizard data={data} onDone={setData} />;
@@ -395,28 +491,59 @@ function Dashboard({ session, onLogout }) {
   const planned = data.suppliers.reduce((sum, item) => sum + Number(item.total || 0), 0);
   const done = data.tasks.filter((task) => task.done).length;
   const role = data.wedding.role || "viewer";
+  const userInitials = String(session.user.name || session.user.email || "GN")
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase() || "GN";
+  const normalizedTopbarSearch = topbarSearch.trim().toLowerCase();
+  const topbarResults = normalizedTopbarSearch ? [
+    ...data.guests
+      .filter((guest) => [guest.name, guest.phone, guest.status, guest.table_label || guest.table_name].join(" ").toLowerCase().includes(normalizedTopbarSearch))
+      .slice(0, 3)
+      .map((guest) => ({ key: `guest-${guest.id}`, section: "guests", title: guest.name, detail: `Invitat - ${guest.status}` })),
+    ...data.tables
+      .filter((table) => [table.name, table.notes].join(" ").toLowerCase().includes(normalizedTopbarSearch))
+      .slice(0, 2)
+      .map((table) => ({ key: `table-${table.id}`, section: "tables", title: table.name, detail: "Masa" })),
+    ...data.suppliers
+      .filter((supplier) => [supplier.name, supplier.phone, supplier.email].join(" ").toLowerCase().includes(normalizedTopbarSearch))
+      .slice(0, 2)
+      .map((supplier) => ({ key: `supplier-${supplier.id}`, section: "suppliers", title: supplier.name, detail: "Financiar" })),
+    ...data.tasks
+      .filter((task) => [task.title, task.owner, task.stage].join(" ").toLowerCase().includes(normalizedTopbarSearch))
+      .slice(0, 2)
+      .map((task) => ({ key: `task-${task.id}`, section: "calendar", title: task.title, detail: "Calendar" })),
+    ...data.mediaUploads
+      .filter((item) => [item.original_name, item.guest_name].join(" ").toLowerCase().includes(normalizedTopbarSearch))
+      .slice(0, 2)
+      .map((item) => ({ key: `media-${item.id}`, section: "media", title: item.original_name, detail: "Media" }))
+  ].slice(0, 7) : [];
   const tabs = [
     ...(session.user.isSuperAdmin ? [["admin", "Super Admin", ShieldCheck]] : []),
     ["progress", "Progres", BarChart3],
-    ["guests", "Invitati", Users],
+    ["guests", "Invitați", Users],
     ["tables", "Mese", Table2],
     ["suppliers", "Financiar", WalletCards],
     ["calendar", "Calendar", CalendarDays],
     ["exports", "Export", Download],
     ["media", "Media", Camera],
-    ...(canRole(role, "owner") ? [["team", "Roluri", UserPlus], ["settings", "Setari", Settings]] : [])
+    ...(canRole(role, "owner") ? [["team", "Roluri", UserPlus], ["settings", "Setări", Settings]] : [])
   ];
 
   return (
     <div className={`app-shell theme-${data.wedding.theme_color || "sage"}`}>
-      {mobileMenuOpen ? <button className="mobile-menu-backdrop" aria-label="Inchide meniul" onClick={() => setMobileMenuOpen(false)} type="button" /> : null}
+      {mobileMenuOpen ? <button className="mobile-menu-backdrop" aria-label="Închide meniul" onClick={() => setMobileMenuOpen(false)} type="button" /> : null}
       <aside className={`sidebar ${mobileMenuOpen ? "mobile-open" : ""}`}>
-        <button className="mobile-menu-close" aria-label="Inchide meniul" onClick={() => setMobileMenuOpen(false)} type="button"><X size={18} /></button>
+        <button className="mobile-menu-close" aria-label="Închide meniul" onClick={() => setMobileMenuOpen(false)} type="button"><X size={18} /></button>
         <div className="brand">
           {data.wedding.profile_image_url ? <img className="profile-photo" src={data.wedding.profile_image_url} alt={data.wedding.couple} /> : <img className="brand-logo" src={appLogo} alt="Gestionare Nunta" />}
           <div>
+            <span className="brand-platform">EverAfter</span>
             <strong>{data.wedding.couple}</strong>
-            <small>{data.wedding.venue || "Nunta activa"}</small>
+            <small>{data.wedding.venue || "Nunta activă"}</small>
           </div>
         </div>
         <div className="sidebar-user">
@@ -449,8 +576,34 @@ function Dashboard({ session, onLogout }) {
           <div>
             <p className="eyebrow">Panou organizatori</p>
             <h1>{data.wedding.couple}</h1>
+            <span className="topbar-subtitle">{data.wedding.venue || "Locație necompletată"}{data.wedding.wedding_date ? ` · ${dateLabel(data.wedding.wedding_date)}` : ""}</span>
           </div>
           <div className="user-tools">
+            <div className="topbar-search-wrap">
+              <label className="topbar-search"><Search size={16} /><input value={topbarSearch} onChange={(event) => applyTopbarSearch(event.target.value)} placeholder="Caută în platformă" /></label>
+              {normalizedTopbarSearch ? (
+                <div className="topbar-results">
+                  {topbarResults.length ? topbarResults.map((result) => (
+                    <button key={result.key} onClick={() => { setActive(result.section); setProfileOpen(false); }} type="button">
+                      <strong>{result.title}</strong>
+                      <span>{result.detail}</span>
+                    </button>
+                  )) : <p>Nu există rezultate.</p>}
+                </div>
+              ) : null}
+            </div>
+            <button className="topbar-account" onClick={() => setProfileOpen(!profileOpen)} title={session.user.name || session.user.email} type="button">
+              <span>{userInitials}</span>
+            </button>
+            {profileOpen ? (
+              <div className="profile-menu">
+                <small>Conectat ca</small>
+                <strong>{session.user.name}</strong>
+                <span>{session.user.email}</span>
+                <button onClick={() => { setProfileOpen(false); setActive(canRole(role, "owner") ? "settings" : "progress"); }} type="button"><User size={15} />Profil</button>
+                <button onClick={() => { setProfileOpen(false); setLogoutConfirm(true); }} type="button"><LogOut size={15} />Deconectare</button>
+              </div>
+            ) : null}
             <button className="icon-button mobile-menu-toggle" onClick={() => setMobileMenuOpen(true)} title="Meniu" type="button"><Menu size={18} /></button>
           </div>
         </header>
@@ -459,19 +612,19 @@ function Dashboard({ session, onLogout }) {
 
         {active === "progress" ? (
           <section className="metrics-grid">
-            <Metric icon={<Users />} label="Persoane confirmate" value={confirmedSeats} detail={`${data.guests.length} invitati in lista`} />
-            <Metric icon={<Table2 />} label="Mese" value={data.tables.length} detail="cu capacitate si repartizare" />
-            <Metric icon={<WalletCards />} label="Buget platit" value={money(paid)} detail={`${money(planned)} planificat`} />
-            <Metric icon={<ClipboardList />} label="Task-uri bifate" value={`${done}/${data.tasks.length}`} detail="organizare curenta" />
+            <Metric icon={<Users />} label="Persoane confirmate" value={confirmedSeats} detail={`${data.guests.length} invitați în listă`} />
+            <Metric icon={<Table2 />} label="Mese" value={data.tables.length} detail="cu capacitate și repartizare" />
+            <Metric icon={<WalletCards />} label="Buget plătit" value={money(paid)} detail={`${money(planned)} planificat`} />
+            <Metric icon={<ClipboardList />} label="Task-uri bifate" value={`${done}/${data.tasks.length}`} detail="organizare curentă" />
           </section>
         ) : null}
 
-        {active === "admin" ? <SuperAdmin mutate={mutate} /> : null}
+        {active === "admin" ? <SuperAdmin mutate={mutate} searchQuery={topbarSearch} /> : null}
         {active === "progress" ? <ProgressReports data={data} /> : null}
-        {active === "guests" ? <GuestInvitationHub data={data} mutate={mutate} /> : null}
-        {active === "tables" ? <SeatingSection data={data} mutate={mutate} /> : null}
-        {active === "suppliers" ? <Suppliers data={data} mutate={mutate} /> : null}
-        {active === "calendar" ? <CalendarView data={data} mutate={mutate} /> : null}
+        {active === "guests" ? <GuestInvitationHub data={data} mutate={mutate} searchQuery={topbarSearch} /> : null}
+        {active === "tables" ? <SeatingSection data={data} mutate={mutate} searchQuery={topbarSearch} /> : null}
+        {active === "suppliers" ? <Suppliers data={data} mutate={mutate} searchQuery={topbarSearch} /> : null}
+        {active === "calendar" ? <CalendarView data={data} mutate={mutate} searchQuery={topbarSearch} /> : null}
         {active === "exports" ? <Exports /> : null}
         {active === "media" ? <MediaHub data={data} mutate={mutate} /> : null}
         {active === "team" ? <Team data={data} mutate={mutate} /> : null}
@@ -479,7 +632,7 @@ function Dashboard({ session, onLogout }) {
         {logoutConfirm ? (
           <ConfirmDialog
             confirmLabel="Deconectare"
-            message="Esti sigur ca vrei sa te deconectezi?"
+            message="Ești sigur că vrei să te deconectezi?"
             onCancel={() => setLogoutConfirm(false)}
             onConfirm={logout}
           />
@@ -504,18 +657,18 @@ function WeddingSwitcher({ data, mutate }) {
 
   return (
     <section className="switcher">
-      <label>Nunta activa
+      <label>Nunta activă
         <select value={data.wedding.id} onChange={(event) => mutate(`/api/weddings/${event.target.value}/select`, { method: "POST" })}>
           {data.weddings.map((wedding) => <option value={wedding.id} key={wedding.id}>{wedding.couple}</option>)}
         </select>
       </label>
-      <button className="ghost-button" onClick={() => setOpen(!open)} type="button"><Plus size={16} />Nunta noua</button>
+      <button className="ghost-button" onClick={() => setOpen(!open)} type="button"><Plus size={16} />Nuntă nouă</button>
       {open ? (
         <form className="mini-form" onSubmit={createWedding}>
-          <input required placeholder="Mireasa & Mire" value={form.couple} onChange={(event) => setForm({ ...form, couple: event.target.value })} />
+          <input required placeholder="Mireasă & Mire" value={form.couple} onChange={(event) => setForm({ ...form, couple: event.target.value })} />
           <input type="date" value={form.wedding_date} onChange={(event) => setForm({ ...form, wedding_date: event.target.value })} />
-          <input placeholder="Locatie" value={form.venue} onChange={(event) => setForm({ ...form, venue: event.target.value })} />
-          <button type="submit">Creeaza</button>
+          <input placeholder="Locație" value={form.venue} onChange={(event) => setForm({ ...form, venue: event.target.value })} />
+          <button type="submit">Creează</button>
         </form>
       ) : null}
     </section>
@@ -579,7 +732,7 @@ function OnboardingWizard({ data, onDone }) {
           <img src={appLogo} alt="Gestionare Nunta" />
           <div>
             <p className="eyebrow">Configurare initiala</p>
-            <h1>Hai sa pregatim nunta</h1>
+            <h1>Hai sa pregatim nuntă</h1>
           </div>
         </div>
         <div className="onboarding-steps">
@@ -589,7 +742,7 @@ function OnboardingWizard({ data, onDone }) {
         {step === 0 ? (
           <div className="onboarding-step">
             <h2>Date de contact</h2>
-            <p>Aceste date raman in cont si ajuta la administrare.</p>
+            <p>Aceste date rămân în cont și ajută la administrare.</p>
             <label>Telefon<span className="auth-input"><PhoneIcon /><input placeholder="07xx xxx xxx" value={form.phone} onChange={(event) => update({ ...form, phone: event.target.value })} /></span></label>
             <label>Adresa ta<span className="auth-input"><MapPin size={19} /><input placeholder="Oras / adresa" value={form.address} onChange={(event) => update({ ...form, address: event.target.value })} /></span></label>
           </div>
@@ -599,7 +752,7 @@ function OnboardingWizard({ data, onDone }) {
           <div className="onboarding-step">
             <h2>Detalii eveniment</h2>
             <p>Le poti modifica oricand mai tarziu din setari.</p>
-            <label>Mireasa & Mire<span className="auth-input"><Users size={19} /><input value={form.couple} onChange={(event) => update({ ...form, couple: event.target.value })} /></span></label>
+            <label>Mireasă & Mire<span className="auth-input"><Users size={19} /><input value={form.couple} onChange={(event) => update({ ...form, couple: event.target.value })} /></span></label>
             <div className="auth-inline-fields">
               <label>Data<span className="auth-input"><CalendarDays size={19} /><input type="date" value={form.wedding_date} onChange={(event) => update({ ...form, wedding_date: event.target.value })} /></span></label>
               <label>Ora<span className="auth-input"><Clock size={19} /><input type="time" value={form.wedding_time} onChange={(event) => update({ ...form, wedding_time: event.target.value })} /></span></label>
@@ -611,8 +764,8 @@ function OnboardingWizard({ data, onDone }) {
 
         {step === 2 ? (
           <div className="onboarding-step">
-            <h2>Design si profil</h2>
-            <p>Alege tema platformei si poza mirilor.</p>
+            <h2>Design și profil</h2>
+            <p>Alege tema platformei și poza mirilor.</p>
             <div className="onboarding-theme-grid">
               {themes.map((theme) => (
                 <button className={form.theme_color === theme.key ? "selected" : ""} key={theme.key} onClick={() => update({ ...form, theme_color: theme.key })} type="button">
@@ -634,7 +787,7 @@ function OnboardingWizard({ data, onDone }) {
         {step === 3 ? (
           <div className="onboarding-step done">
             <h2>Totul este pregatit</h2>
-            <p>Salvam configurarea initiala si intri in platforma.</p>
+            <p>Salvăm configurarea inițială și intri în platformă.</p>
             <div className="onboarding-summary">
               <span>{form.couple || "Nunta"}</span>
               <span>{form.venue || "Restaurant necompletat"}</span>
@@ -645,8 +798,8 @@ function OnboardingWizard({ data, onDone }) {
 
         {error ? <p className="form-error">{error}</p> : null}
         <div className="onboarding-actions">
-          <button className="tool-button" disabled={step === 0 || saving} onClick={() => setStep(step - 1)} type="button">Inapoi</button>
-          {step < steps.length - 1 ? <button className="settings-save" onClick={() => setStep(step + 1)} type="button">Continua</button> : <button className="settings-save" disabled={saving} onClick={submit} type="button">{saving ? "Se salveaza..." : "Intra in platforma"}</button>}
+          <button className="tool-button" disabled={step === 0 || saving} onClick={() => setStep(step - 1)} type="button">Înapoi</button>
+          {step < steps.length - 1 ? <button className="settings-save" onClick={() => setStep(step + 1)} type="button">Continuă</button> : <button className="settings-save" disabled={saving} onClick={submit} type="button">{saving ? "Se salvează..." : "Intră în platformă"}</button>}
         </div>
       </section>
     </main>
@@ -657,7 +810,7 @@ function PhoneIcon() {
   return <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.35 1.9.66 2.81a2 2 0 0 1-.45 2.11L8.05 9.91a16 16 0 0 0 6.04 6.04l1.27-1.27a2 2 0 0 1 2.11-.45c.91.31 1.85.53 2.81.66A2 2 0 0 1 22 16.92z" /></svg>;
 }
 
-function SuperAdmin({ mutate }) {
+function SuperAdmin({ mutate, searchQuery = "" }) {
   const [admin, setAdmin] = useState(null);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
@@ -667,6 +820,9 @@ function SuperAdmin({ mutate }) {
   useEffect(() => {
     api("/api/admin/dashboard").then(setAdmin).catch((err) => setError(err.message));
   }, []);
+  useEffect(() => {
+    setSearch(searchQuery);
+  }, [searchQuery]);
 
   if (error) return <section className="module"><p className="form-error">{error}</p></section>;
   if (!admin) return <section className="module"><div className="loader" /></section>;
@@ -705,18 +861,18 @@ function SuperAdmin({ mutate }) {
         </div>
       ) : null}
       <div className="module-title">
-        <div><p className="eyebrow">Super admin</p><h2>Dashboard platforma si clienti</h2></div>
+        <div><p className="eyebrow">Super admin</p><h2>Dashboard platformă și clienți</h2></div>
       </div>
       <section className="metrics-grid">
         <Metric icon={<Users />} label="Clienti" value={admin.totals.clients} detail={`${admin.totals.weddings} nunti`} />
-        <Metric icon={<BarChart3 />} label="Invitati" value={admin.totals.guests} detail="in toate nuntile" />
+        <Metric icon={<BarChart3 />} label="Invitați" value={admin.totals.guests} detail="in toate nuntile" />
         <Metric icon={<Bell />} label="Uploaduri noi" value={admin.totals.newUploads} detail={`${admin.totals.uploads} total`} />
         <Metric icon={<WalletCards />} label="Platit total" value={money(admin.totals.paid)} detail={`${money(admin.totals.planned)} planificat`} />
       </section>
       <section className="admin-insights-grid">
         <article className="admin-insight-card">
           <div>
-            <p className="eyebrow">Status clienti</p>
+            <p className="eyebrow">Status clienți</p>
             <h3>{activeClients} activi</h3>
             <span>{inactiveClients} dezactivati</span>
           </div>
@@ -726,7 +882,7 @@ function SuperAdmin({ mutate }) {
         </article>
         <article className="admin-insight-card">
           <div>
-            <p className="eyebrow">Nunti viitoare</p>
+            <p className="eyebrow">Nunți viitoare</p>
             <h3>{upcomingWeddings}</h3>
             <span>din {admin.totals.weddings} gestionari</span>
           </div>
@@ -736,7 +892,7 @@ function SuperAdmin({ mutate }) {
           <div>
             <p className="eyebrow">Rata confirmari</p>
             <h3>{acceptanceRate}%</h3>
-            <span>locuri confirmate din invitati</span>
+            <span>locuri confirmate din invitați</span>
           </div>
           <div className="mini-bars"><span style={{ width: `${acceptanceRate}%` }} /></div>
         </article>
@@ -744,39 +900,56 @@ function SuperAdmin({ mutate }) {
           <div>
             <p className="eyebrow">Buget incasat</p>
             <h3>{budgetRate}%</h3>
-            <span>{money(admin.totals.paid)} platit</span>
+            <span>{money(admin.totals.paid)} plătit</span>
           </div>
           <div className="mini-bars"><span style={{ width: `${budgetRate}%` }} /></div>
         </article>
       </section>
       <section className="admin-snapshot-grid">
-        <article className="report-card admin-list-card">
-          <h3>Ultimi clienti adaugati</h3>
-          {recentWeddings.length ? recentWeddings.map((wedding) => (
-            <p key={wedding.id}>
-              <strong>{wedding.couple}</strong>
-              <span>{wedding.owner_email}</span>
-            </p>
-          )) : <p><strong>Nu exista clienti</strong><span>-</span></p>}
+        <article className="dashboard-list-card accent-clients">
+          <div className="dashboard-list-head">
+            <span><UserPlus size={18} /></span>
+            <div><small>Clienți</small><h3>Ultimele conturi create</h3></div>
+          </div>
+          <div className="dashboard-list">
+            {recentWeddings.length ? recentWeddings.map((wedding) => (
+              <p key={wedding.id}>
+                <i>{String(wedding.couple || "EA").slice(0, 2).toUpperCase()}</i>
+                <strong>{wedding.couple}</strong>
+                <span>{wedding.owner_email}</span>
+              </p>
+            )) : <p><i>0</i><strong>Nu există clienți</strong><span>-</span></p>}
+          </div>
         </article>
-        <article className="report-card admin-list-card">
-          <h3>Nunti cu cei mai multi invitati</h3>
-          {topByGuests.length ? topByGuests.map((wedding) => (
-            <p key={wedding.id}>
-              <strong>{wedding.couple}</strong>
-              <span>{wedding.guests} invitati</span>
-            </p>
-          )) : <p><strong>Nu exista invitati</strong><span>-</span></p>}
+        <article className="dashboard-list-card accent-guests">
+          <div className="dashboard-list-head">
+            <span><Users size={18} /></span>
+            <div><small>Invitați</small><h3>Nunți cu cei mai mulți invitați</h3></div>
+          </div>
+          <div className="dashboard-list">
+            {topByGuests.length ? topByGuests.map((wedding) => (
+              <p key={wedding.id}>
+                <i>{wedding.guests}</i>
+                <strong>{wedding.couple}</strong>
+                <span>{wedding.guests} invitați</span>
+              </p>
+            )) : <p><i>0</i><strong>Nu există invitați</strong><span>-</span></p>}
+          </div>
         </article>
-        <article className="report-card admin-list-card">
-          <h3>Atentionari rapide</h3>
-          <p><strong>Uploaduri nevazute</strong><span>{admin.totals.newUploads}</span></p>
-          <p><strong>Clienti dezactivati</strong><span>{inactiveClients}</span></p>
-          <p><strong>Fara data nunta</strong><span>{admin.weddings.filter((wedding) => !wedding.wedding_date).length}</span></p>
+        <article className="dashboard-list-card accent-alerts">
+          <div className="dashboard-list-head">
+            <span><Bell size={18} /></span>
+            <div><small>Status</small><h3>Atenționări rapide</h3></div>
+          </div>
+          <div className="dashboard-list">
+            <p><i>{admin.totals.newUploads}</i><strong>Uploaduri nevăzute</strong><span>media nouă</span></p>
+            <p><i>{inactiveClients}</i><strong>Clienți dezactivați</strong><span>conturi oprite</span></p>
+            <p><i>{admin.weddings.filter((wedding) => !wedding.wedding_date).length}</i><strong>Fără data nunții</strong><span>de completat</span></p>
+          </div>
         </article>
       </section>
       <div className="module-title compact-title">
-        <div><p className="eyebrow">Nunta noua</p><h2>Creeaza client si nunta</h2></div>
+        <div><p className="eyebrow">Nuntă nouă</p><h2>Creează client și nuntă</h2></div>
       </div>
       <form className="entry-form admin-client-form" onSubmit={async (event) => {
         event.preventDefault();
@@ -786,17 +959,17 @@ function SuperAdmin({ mutate }) {
       }}>
         <input required placeholder="Nume client" value={client.name} onChange={(event) => setClient({ ...client, name: event.target.value })} />
         <input required placeholder="Email" value={client.email} onChange={(event) => setClient({ ...client, email: event.target.value })} />
-        <input required placeholder="Parola initiala" value={client.password} onChange={(event) => setClient({ ...client, password: event.target.value })} />
-        <input required placeholder="Mireasa & Mire" value={client.couple} onChange={(event) => setClient({ ...client, couple: event.target.value })} />
+        <input required placeholder="Parola inițială" value={client.password} onChange={(event) => setClient({ ...client, password: event.target.value })} />
+        <input required placeholder="Mireasă & Mire" value={client.couple} onChange={(event) => setClient({ ...client, couple: event.target.value })} />
         <input type="date" value={client.wedding_date} onChange={(event) => setClient({ ...client, wedding_date: event.target.value })} />
         <input type="time" value={client.wedding_time} onChange={(event) => setClient({ ...client, wedding_time: event.target.value })} />
-        <input placeholder="Locatie" value={client.venue} onChange={(event) => setClient({ ...client, venue: event.target.value })} />
-        <button type="submit"><Plus size={18} />Creeaza nunta</button>
+        <input placeholder="Locație" value={client.venue} onChange={(event) => setClient({ ...client, venue: event.target.value })} />
+        <button type="submit"><Plus size={18} />Creează nuntă</button>
       </form>
-      <div className="filter-bar"><label><Search size={16} />Cauta<input placeholder="Client, nunta, locatie" value={search} onChange={(event) => setSearch(event.target.value)} /></label></div>
+      <div className="filter-bar"><label><Search size={16} />Caută<input placeholder="Client, nuntă, locație" value={search} onChange={(event) => setSearch(event.target.value)} /></label></div>
       <div className="table-wrap">
         <table>
-          <thead><tr><th>Nunta</th><th>Client</th><th>Ultima conectare</th><th>Data</th><th>Invitati</th><th>Uploaduri</th><th>Buget</th><th></th></tr></thead>
+          <thead><tr><th>Nunta</th><th>Client</th><th>Ultima conectare</th><th>Data</th><th>Invitați</th><th>Uploaduri</th><th>Buget</th><th></th></tr></thead>
           <tbody>
             {weddings.map((wedding) => (
               <tr key={wedding.id}>
@@ -815,7 +988,7 @@ function SuperAdmin({ mutate }) {
                 <td>
                   <div className="row-actions">
                     <button className="tool-button" onClick={() => enterWedding(wedding)} type="button"><Eye size={17} />Intra</button>
-                    <button className="tool-button" onClick={async () => setAdmin(await api(`/api/admin/users/${wedding.owner_id}/status`, { method: "POST", body: JSON.stringify({ status: wedding.status === "inactive" ? "active" : "inactive" }) }))} type="button">{wedding.status === "inactive" ? "Activeaza" : "Dezactiveaza"}</button>
+                    <button className="tool-button" onClick={async () => setAdmin(await api(`/api/admin/users/${wedding.owner_id}/status`, { method: "POST", body: JSON.stringify({ status: wedding.status === "inactive" ? "active" : "inactive" }) }))} type="button">{wedding.status === "inactive" ? "Activează" : "Dezactivează"}</button>
                   </div>
                 </td>
               </tr>
@@ -852,16 +1025,36 @@ function ProgressReports({ data }) {
 
   return (
     <section className="module">
-      <div className="module-title"><div><p className="eyebrow">Rapoarte</p><h2>Nunta este {score}% pregatita</h2></div></div>
+      <div className="module-title"><div><p className="eyebrow">Rapoarte</p><h2>Nunta este {score}% pregătită</h2></div></div>
       <div className="report-grid">
-        <ReportBar label="Confirmari" value={confirmed} total={invited} />
-        <ReportBar label="Asezare la mese" value={seated} total={Math.max(confirmed, 1)} />
+        <ReportBar label="Confirmări" value={confirmed} total={invited} />
+        <ReportBar label="Așezare la mese" value={seated} total={Math.max(confirmed, 1)} />
         <ReportBar label="Sarcini" value={tasksDone} total={Math.max(data.tasks.length, 1)} />
-        <ReportBar label="Buget platit" value={budgetPaid} total={budgetPlan} moneyMode />
+        <ReportBar label="Buget plătit" value={budgetPaid} total={budgetPlan} moneyMode />
       </div>
       <div className="report-grid">
-        <article className="report-card"><h3>Meniuri</h3>{Object.entries(menuCounts).map(([key, value]) => <p key={key}><strong>{key}</strong><span>{value}</span></p>)}</article>
-        <article className="report-card"><h3>Atentionari</h3><p>Invitati confirmati fara masa <span>{data.guests.filter((guest) => guest.status === "Confirmat" && !guest.table_id).length}</span></p><p>Task-uri apropiate <span>{data.notifications.openTasks}</span></p><p>Plati apropiate <span>{data.notifications.duePayments}</span></p></article>
+        <article className="dashboard-list-card compact-report accent-menu">
+          <div className="dashboard-list-head">
+            <span><ClipboardList size={18} /></span>
+            <div><small>Preferințe</small><h3>Meniuri alese</h3></div>
+          </div>
+          <div className="dashboard-list">
+            {Object.entries(menuCounts).length ? Object.entries(menuCounts).map(([key, value]) => (
+              <p key={key}><i>{value}</i><strong>{key}</strong><span>{value === 1 ? "invitat" : "invitați"}</span></p>
+            )) : <p><i>0</i><strong>Nu există meniuri alese</strong><span>-</span></p>}
+          </div>
+        </article>
+        <article className="dashboard-list-card compact-report accent-alerts">
+          <div className="dashboard-list-head">
+            <span><Bell size={18} /></span>
+            <div><small>De urmărit</small><h3>Atenționări</h3></div>
+          </div>
+          <div className="dashboard-list">
+            <p><i>{data.guests.filter((guest) => guest.status === "Confirmat" && !guest.table_id).length}</i><strong>Invitați confirmați fără masă</strong><span>așezare</span></p>
+            <p><i>{data.notifications.openTasks}</i><strong>Task-uri apropiate</strong><span>calendar</span></p>
+            <p><i>{data.notifications.duePayments}</i><strong>Plăți apropiate</strong><span>financiar</span></p>
+          </div>
+        </article>
       </div>
     </section>
   );
@@ -872,22 +1065,22 @@ function ReportBar({ label, value, total, moneyMode = false }) {
   return <article className="report-card"><h3>{label}</h3><div className="bar-track"><span style={{ width: `${percent}%` }} /></div><p><strong>{percent}%</strong><span>{moneyMode ? `${money(value)} / ${money(total)}` : `${value} / ${total}`}</span></p></article>;
 }
 
-function GuestInvitationHub({ data, mutate }) {
+function GuestInvitationHub({ data, mutate, searchQuery = "" }) {
   const [tab, setTab] = useState("guests");
   const canOpenInvitation = canRole(data.wedding.role, "owner");
   return (
     <section className="hub-stack">
       <div className="segmented section-tabs hub-tabs">
-        <button className={tab === "guests" ? "active" : ""} onClick={() => setTab("guests")} type="button"><Users size={16} />Invitati</button>
-        {canOpenInvitation ? <button className={tab === "invitation" ? "active" : ""} onClick={() => setTab("invitation")} type="button"><FileText size={16} />Invitatie</button> : null}
+        <button className={tab === "guests" ? "active" : ""} onClick={() => setTab("guests")} type="button"><Users size={16} />Invitați</button>
+        {canOpenInvitation ? <button className={tab === "invitation" ? "active" : ""} onClick={() => setTab("invitation")} type="button"><FileText size={16} />Invitație</button> : null}
       </div>
-      {tab === "guests" ? <Guests data={data} mutate={mutate} embedded /> : null}
+      {tab === "guests" ? <Guests data={data} mutate={mutate} embedded searchQuery={searchQuery} /> : null}
       {tab === "invitation" && canOpenInvitation ? <InvitationSettings data={data} mutate={mutate} embedded /> : null}
     </section>
   );
 }
 
-function Guests({ data, mutate }) {
+function Guests({ data, mutate, searchQuery = "" }) {
   const [form, setForm] = useState(emptyGuest);
   const [editGuest, setEditGuest] = useState(null);
   const [copied, setCopied] = useState("");
@@ -895,6 +1088,10 @@ function Guests({ data, mutate }) {
   const [page, setPage] = useState(1);
   const { askDelete, dialog } = useConfirmDelete(mutate);
   const canEdit = canRole(data.wedding.role, "planner");
+  useEffect(() => {
+    setFilters((current) => ({ ...current, search: searchQuery }));
+    setPage(1);
+  }, [searchQuery]);
   const filteredGuests = data.guests.filter((guest) => {
     const term = filters.search.toLowerCase();
     const matchesText = [guest.name, guest.phone, guest.side].join(" ").toLowerCase().includes(term);
@@ -929,7 +1126,7 @@ function Guests({ data, mutate }) {
       last_name: parts.last_name,
       phone: guest.phone || "",
       side: guest.side || "Comun",
-      status: guest.status || "In asteptare",
+      status: guest.status || "În așteptare",
       seats: guest.seats || 1,
       meal_choice: guest.meal_choice || "",
       allergies: guest.allergies || "",
@@ -945,7 +1142,7 @@ function Guests({ data, mutate }) {
   }
 
   function exportGuests() {
-    const headers = ["Nume", "Prenume", "Telefon", "Status", "Confirmat la", "Locuri", "Meniu", "Masa", "Link invitatie"];
+    const headers = ["Nume", "Prenume", "Telefon", "Status", "Confirmat la", "Locuri", "Meniu", "Masa", "Link invitație"];
     const lines = filteredGuests.map((guest) => {
       const [firstName, ...rest] = String(guest.name || "").split(" ");
       const row = [firstName || "", rest.join(" "), guest.phone || "", guest.status || "", confirmationLabel(guest), guest.seats || "", mealSummary(guest), guest.table_label || guest.table_name || "", guest.inviteUrl || ""];
@@ -963,29 +1160,29 @@ function Guests({ data, mutate }) {
   return (
     <section className="module">
       <div className="module-title">
-        <div><p className="eyebrow">Invitati</p><h2>Confirmari detaliate si WhatsApp</h2></div>
+        <div><p className="eyebrow">Invitați</p><h2>Confirmări detaliate și WhatsApp</h2></div>
       </div>
       {canEdit ? <form className="entry-form guests-form" onSubmit={addGuest}>
         <input required placeholder="Nume" value={form.first_name} onChange={(event) => setForm({ ...form, first_name: event.target.value })} />
         <input required placeholder="Prenume" value={form.last_name} onChange={(event) => setForm({ ...form, last_name: event.target.value })} />
         <input placeholder="Telefon 40740..." value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
-        <select value={form.side} onChange={(event) => setForm({ ...form, side: event.target.value })}><option>Comun</option><option>Mireasa</option><option>Mire</option></select>
+        <select value={form.side} onChange={(event) => setForm({ ...form, side: event.target.value })}><option>Comun</option><option>Mireasă</option><option>Mire</option></select>
         <input type="number" min="1" max="10" value={form.seats} onChange={(event) => setForm({ ...form, seats: event.target.value })} />
         <select value={form.table_id} onChange={(event) => setForm({ ...form, table_id: event.target.value })}>
           <option value="">Fara masa</option>
           {data.tables.map((table) => <option value={table.id} key={table.id}>{table.name}</option>)}
         </select>
-        <button type="submit"><Plus size={18} />Adauga</button>
+        <button type="submit"><Plus size={18} />Adaugă</button>
       </form> : null}
       <div className="filter-bar guest-filter-bar">
-        <label><Search size={16} />Cauta<input placeholder="Nume sau telefon" value={filters.search} onChange={(event) => { setFilters({ ...filters, search: event.target.value }); setPage(1); }} /></label>
-        <label>Status<select value={filters.status} onChange={(event) => { setFilters({ ...filters, status: event.target.value }); setPage(1); }}><option value="all">Toate</option><option>In asteptare</option><option>Confirmat</option><option>Refuzat</option></select></label>
+        <label><Search size={16} />Caută<input placeholder="Nume sau telefon" value={filters.search} onChange={(event) => { setFilters({ ...filters, search: event.target.value }); setPage(1); }} /></label>
+        <label>Status<select value={filters.status} onChange={(event) => { setFilters({ ...filters, status: event.target.value }); setPage(1); }}><option value="all">Toate</option><option>În așteptare</option><option>Confirmat</option><option>Refuzat</option></select></label>
         <label>Masa<select value={filters.table} onChange={(event) => { setFilters({ ...filters, table: event.target.value }); setPage(1); }}><option value="all">Toate</option><option value="none">Fara masa</option>{data.tables.map((table) => <option value={table.id} key={table.id}>{table.name}</option>)}</select></label>
         <button className="tool-button" onClick={exportGuests} type="button"><Download size={16} />Excel</button>
       </div>
       <div className="table-wrap guest-table-wrap">
         <table>
-          <thead><tr><th>Invitat</th><th>Status</th><th>Confirmat la</th><th>Locuri</th><th>Meniu</th><th>Masa</th><th>Invitatie</th><th></th></tr></thead>
+          <thead><tr><th>Invitat</th><th>Status</th><th>Confirmat la</th><th>Locuri</th><th>Meniu</th><th>Masa</th><th>Invitație</th><th></th></tr></thead>
           <tbody>
             {pageGuests.map((guest) => {
               const [firstName, ...restName] = String(guest.name || "").split(" ");
@@ -993,7 +1190,7 @@ function Guests({ data, mutate }) {
               return (
                 <React.Fragment key={guest.id}>
                   <tr>
-                    <td><strong>{firstName} {restName.join(" ")}</strong><small>{guest.phone || "fara telefon"} - {guest.side}</small></td>
+                    <td><strong>{firstName} {restName.join(" ")}</strong><small>{guest.phone || "fără telefon"} - {guest.side}</small></td>
                     <td><span className={`pill ${guest.status === "Confirmat" ? "yes" : guest.status === "Refuzat" ? "no" : ""}`}>{guest.status}</span></td>
                     <td><small>{confirmationLabel(guest)}</small></td>
                     <td>{guest.seats} <small>{partyLabel(guest.seats)}</small></td>
@@ -1007,8 +1204,8 @@ function Guests({ data, mutate }) {
                     </td>
                     <td>
                       {canEdit ? <div className="row-actions">
-                        <button className="icon-button" onClick={() => startEditGuest(guest)} title="Editeaza" type="button"><Pencil size={17} /></button>
-                        <button className="icon-button danger" onClick={() => askDelete(`/api/guests/${guest.id}`, `Stergi invitatul ${guest.name}?`)} title="Sterge" type="button"><Trash2 size={17} /></button>
+                        <button className="icon-button" onClick={() => startEditGuest(guest)} title="Editează" type="button"><Pencil size={17} /></button>
+                        <button className="icon-button danger" onClick={() => askDelete(`/api/guests/${guest.id}`, `Ștergi invitatul ${guest.name}?`)} title="Șterge" type="button"><Trash2 size={17} /></button>
                       </div> : null}
                     </td>
                   </tr>
@@ -1019,8 +1216,8 @@ function Guests({ data, mutate }) {
                           <input required placeholder="Nume" value={editGuest.first_name} onChange={(event) => setEditGuest({ ...editGuest, first_name: event.target.value })} />
                           <input required placeholder="Prenume" value={editGuest.last_name} onChange={(event) => setEditGuest({ ...editGuest, last_name: event.target.value })} />
                           <input placeholder="Telefon" value={editGuest.phone} onChange={(event) => setEditGuest({ ...editGuest, phone: event.target.value })} />
-                          <select value={editGuest.side} onChange={(event) => setEditGuest({ ...editGuest, side: event.target.value })}><option>Comun</option><option>Mireasa</option><option>Mire</option></select>
-                          <select value={editGuest.status} onChange={(event) => setEditGuest({ ...editGuest, status: event.target.value })}><option>In asteptare</option><option>Confirmat</option><option>Refuzat</option></select>
+                          <select value={editGuest.side} onChange={(event) => setEditGuest({ ...editGuest, side: event.target.value })}><option>Comun</option><option>Mireasă</option><option>Mire</option></select>
+                          <select value={editGuest.status} onChange={(event) => setEditGuest({ ...editGuest, status: event.target.value })}><option>În așteptare</option><option>Confirmat</option><option>Refuzat</option></select>
                           <input type="number" min="1" max="10" value={editGuest.seats} onChange={(event) => setEditGuest({ ...editGuest, seats: event.target.value })} />
                           <input placeholder="Meniu" value={editGuest.meal_choice} onChange={(event) => setEditGuest({ ...editGuest, meal_choice: event.target.value })} />
                           <input placeholder="Alergii" value={editGuest.allergies} onChange={(event) => setEditGuest({ ...editGuest, allergies: event.target.value })} />
@@ -1028,8 +1225,8 @@ function Guests({ data, mutate }) {
                             <option value="">Fara masa</option>
                             {data.tables.map((table) => <option value={table.id} key={table.id}>{table.name}</option>)}
                           </select>
-                          <button type="submit"><Check size={17} />Salveaza</button>
-                          <button className="tool-button" onClick={() => setEditGuest(null)} type="button"><X size={17} />Anuleaza</button>
+                          <button type="submit"><Check size={17} />Salvează</button>
+                          <button className="tool-button" onClick={() => setEditGuest(null)} type="button"><X size={17} />Anulează</button>
                         </form>
                       </td>
                     </tr>
@@ -1041,10 +1238,10 @@ function Guests({ data, mutate }) {
         </table>
       </div>
       <div className="pagination">
-        <span>{filteredGuests.length} invitati - pagina {currentPage} din {totalPages}</span>
+        <span>{filteredGuests.length} invitați - pagina {currentPage} din {totalPages}</span>
         <div className="row-actions">
-          <button className="tool-button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} type="button">Inapoi</button>
-          <button className="tool-button" disabled={currentPage === totalPages} onClick={() => setPage(currentPage + 1)} type="button">Urmatoarea</button>
+          <button className="tool-button" disabled={currentPage === 1} onClick={() => setPage(currentPage - 1)} type="button">Înapoi</button>
+          <button className="tool-button" disabled={currentPage === totalPages} onClick={() => setPage(currentPage + 1)} type="button">Următoarea</button>
         </div>
       </div>
       {dialog}
@@ -1052,28 +1249,31 @@ function Guests({ data, mutate }) {
   );
 }
 
-function SeatingSection({ data, mutate }) {
+function SeatingSection({ data, mutate, searchQuery = "" }) {
   const [tab, setTab] = useState("tables");
   return (
     <section className="module">
       <div className="module-title seating-title">
-        <div><p className="eyebrow">Sala</p><h2>Mese si plan sala</h2></div>
+        <div><p className="eyebrow">Sală</p><h2>Mese și plan sală</h2></div>
         <div className="segmented section-tabs">
-          <button className={tab === "tables" ? "active" : ""} onClick={() => setTab("tables")} type="button">Asezare invitati</button>
-          <button className={tab === "plan" ? "active" : ""} onClick={() => setTab("plan")} type="button">Plan sala</button>
+          <button className={tab === "tables" ? "active" : ""} onClick={() => setTab("tables")} type="button">Așezare invitați</button>
+          <button className={tab === "plan" ? "active" : ""} onClick={() => setTab("plan")} type="button">Plan sală</button>
         </div>
       </div>
-      {tab === "tables" ? <Tables data={data} embedded mutate={mutate} /> : <RoomPlan data={data} embedded mutate={mutate} />}
+      {tab === "tables" ? <Tables data={data} embedded mutate={mutate} searchQuery={searchQuery} /> : <RoomPlan data={data} embedded mutate={mutate} />}
     </section>
   );
 }
 
-function Tables({ data, mutate, embedded = false }) {
+function Tables({ data, mutate, embedded = false, searchQuery = "" }) {
   const [form, setForm] = useState({ name: "", capacity: 8, notes: "" });
   const [search, setSearch] = useState("");
   const { askDelete, dialog } = useConfirmDelete(mutate);
   const canEdit = canRole(data.wedding.role, "planner");
   const unseated = data.guests.filter((guest) => guest.status === "Confirmat" && !guest.table_id);
+  useEffect(() => {
+    setSearch(searchQuery);
+  }, [searchQuery]);
   const tables = data.tables.filter((table) => table.name.toLowerCase().includes(search.toLowerCase()) || data.guests.some((guest) => guest.table_id === table.id && guest.name.toLowerCase().includes(search.toLowerCase())));
 
   async function createTable(event) {
@@ -1091,20 +1291,20 @@ function Tables({ data, mutate, embedded = false }) {
       {canEdit ? <form className="entry-form table-form" onSubmit={createTable}>
         <input required placeholder="Nume masa" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
         <input type="number" min="1" max="30" value={form.capacity} onChange={(event) => setForm({ ...form, capacity: event.target.value })} />
-        <input placeholder="Observatii" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
-        <button type="submit"><Plus size={18} />Adauga masa</button>
+        <input placeholder="Observații" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
+        <button type="submit"><Plus size={18} />Adaugă masa</button>
       </form> : null}
-      <div className="filter-bar"><label><Search size={16} />Cauta<input placeholder="Masa sau invitat" value={search} onChange={(event) => setSearch(event.target.value)} /></label></div>
+      <div className="filter-bar"><label><Search size={16} />Caută<input placeholder="Masa sau invitat" value={search} onChange={(event) => setSearch(event.target.value)} /></label></div>
       <div className="seating-layout">
         <aside className="panel">
-          <h3>Invitati confirmati neasezati</h3>
+          <h3>Invitați confirmați neașezați</h3>
           <div className="chip-list">
             {unseated.length ? unseated.map((guest) => (
               <div className="guest-chip" draggable={canEdit} onDragStart={canEdit ? (event) => event.dataTransfer.setData("guestId", guest.id) : undefined} key={guest.id}>
                 <strong>{guest.name}</strong><small>{guest.seats} locuri</small>
                 {Number(guest.seats || 1) > 1 ? <span className="plus-badge">{partyLabel(guest.seats)}</span> : null}
               </div>
-            )) : <p className="empty-state">Toti invitatii confirmati sunt asezati.</p>}
+            )) : <p className="empty-state">Toți invitații confirmați sunt așezați.</p>}
           </div>
         </aside>
         <section className="table-grid">
@@ -1116,9 +1316,9 @@ function Tables({ data, mutate, embedded = false }) {
               <article className={`table-card ${over ? "over" : ""}`} key={table.id} onDragOver={canEdit ? (event) => event.preventDefault() : undefined} onDrop={canEdit ? (event) => assignGuest(event.dataTransfer.getData("guestId"), table.id) : undefined}>
                 <header>
                   <div className="table-title"><span className="table-icon" /><strong>{table.name}</strong><small>{seats}/{table.capacity} locuri</small></div>
-                  {canEdit ? <button className="icon-button danger" onClick={() => askDelete(`/api/tables/${table.id}`, `Stergi masa ${table.name}? Invitatii de la aceasta masa vor ramane neasezati.`)} type="button"><Trash2 size={17} /></button> : null}
+                  {canEdit ? <button className="icon-button danger" onClick={() => askDelete(`/api/tables/${table.id}`, `Ștergi masa ${table.name}? Invitații de la această masă vor rămâne neașezați.`)} type="button"><Trash2 size={17} /></button> : null}
                 </header>
-                {over ? <p className="capacity-warning">Capacitate depasita</p> : null}
+                {over ? <p className="capacity-warning">Capacitate depășită</p> : null}
                 <div className="chip-list">
                   {seated.map((guest) => (
                     <div className="guest-chip" key={guest.id}>
@@ -1198,14 +1398,14 @@ function RoomPlan({ data, mutate, embedded = false }) {
 
   return (
     <section className="module">
-      <div className="module-title"><div><p className="eyebrow">Plan sala</p><h2>Trage vizual mesele in sala</h2></div></div>
+      <div className="module-title"><div><p className="eyebrow">Plan sală</p><h2>Trage vizual mesele in sala</h2></div></div>
       {content}
     </section>
   );
 }
 
 function Budget({ data, mutate }) {
-  const [form, setForm] = useState({ item: "", supplier: "", planned: "", paid: "", status: "De platit", due: "" });
+  const [form, setForm] = useState({ item: "", supplier: "", planned: "", paid: "", status: "De plătit", due: "" });
   const [filters, setFilters] = useState({ search: "", status: "all" });
   const { askDelete, dialog } = useConfirmDelete(mutate);
   const rows = data.budget.filter((item) => {
@@ -1216,38 +1416,41 @@ function Budget({ data, mutate }) {
   async function submit(event) {
     event.preventDefault();
     await mutate("/api/budget", { method: "POST", body: JSON.stringify(form) });
-    setForm({ item: "", supplier: "", planned: "", paid: "", status: "De platit", due: "" });
+    setForm({ item: "", supplier: "", planned: "", paid: "", status: "De plătit", due: "" });
   }
   return (
     <section className="module">
-      <div className="module-title"><div><p className="eyebrow">Financiar</p><h2>Buget, furnizori si scadente</h2></div></div>
+      <div className="module-title"><div><p className="eyebrow">Financiar</p><h2>Buget, furnizori și scadențe</h2></div></div>
       <form className="entry-form budget-form" onSubmit={submit}>
         <input required placeholder="Element" value={form.item} onChange={(event) => setForm({ ...form, item: event.target.value })} />
         <input placeholder="Furnizor" value={form.supplier} onChange={(event) => setForm({ ...form, supplier: event.target.value })} />
         <input type="number" min="0" placeholder="Planificat" value={form.planned} onChange={(event) => setForm({ ...form, planned: event.target.value })} />
         <input type="number" min="0" placeholder="Platit" value={form.paid} onChange={(event) => setForm({ ...form, paid: event.target.value })} />
         <input type="date" value={form.due} onChange={(event) => setForm({ ...form, due: event.target.value })} />
-        <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}><option>De platit</option><option>Avans</option><option>Achitat</option></select>
-        <button type="submit"><Plus size={18} />Adauga</button>
+        <select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}><option>De plătit</option><option>Avans</option><option>Achitat</option></select>
+        <button type="submit"><Plus size={18} />Adaugă</button>
       </form>
       <div className="filter-bar">
-        <label><Search size={16} />Cauta<input placeholder="Element sau furnizor" value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} /></label>
-        <label>Status<select value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })}><option value="all">Toate</option><option>De platit</option><option>Avans</option><option>Achitat</option></select></label>
+        <label><Search size={16} />Caută<input placeholder="Element sau furnizor" value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} /></label>
+        <label>Status<select value={filters.status} onChange={(event) => setFilters({ ...filters, status: event.target.value })}><option value="all">Toate</option><option>De plătit</option><option>Avans</option><option>Achitat</option></select></label>
       </div>
       <div className="table-wrap"><table><thead><tr><th>Element</th><th>Furnizor</th><th>Planificat</th><th>Platit</th><th>Scadenta</th><th>Status</th><th></th></tr></thead><tbody>
-        {rows.map((item) => <tr key={item.id}><td><strong>{item.item}</strong></td><td>{item.supplier || "-"}</td><td>{money(item.planned)}</td><td>{money(item.paid)}</td><td>{item.due || "-"}</td><td><span className="pill">{item.status}</span></td><td><button className="icon-button danger" onClick={() => askDelete(`/api/budget/${item.id}`, `Stergi elementul de buget ${item.item}?`)} type="button"><Trash2 size={17} /></button></td></tr>)}
+        {rows.map((item) => <tr key={item.id}><td><strong>{item.item}</strong></td><td>{item.supplier || "-"}</td><td>{money(item.planned)}</td><td>{money(item.paid)}</td><td>{item.due || "-"}</td><td><span className="pill">{item.status}</span></td><td><button className="icon-button danger" onClick={() => askDelete(`/api/budget/${item.id}`, `Ștergi elementul de buget ${item.item}?`)} type="button"><Trash2 size={17} /></button></td></tr>)}
       </tbody></table></div>
       {dialog}
     </section>
   );
 }
 
-function Suppliers({ data, mutate }) {
+function Suppliers({ data, mutate, searchQuery = "" }) {
   const [form, setForm] = useState({ name: "", category: "", phone: "", email: "", advance: "", total: "", due: "", notes: "", contract: null });
   const [editSupplier, setEditSupplier] = useState(null);
   const [search, setSearch] = useState("");
   const { askDelete, dialog } = useConfirmDelete(mutate);
   const canEdit = canRole(data.wedding.role, "planner");
+  useEffect(() => {
+    setSearch(searchQuery);
+  }, [searchQuery]);
   const rows = data.suppliers.filter((supplier) => [supplier.name, supplier.phone, supplier.email].join(" ").toLowerCase().includes(search.toLowerCase()));
   const planned = rows.reduce((sum, supplier) => sum + Number(supplier.total || 0), 0);
   const paid = rows.reduce((sum, supplier) => sum + Number(supplier.advance || 0), 0);
@@ -1293,22 +1496,22 @@ function Suppliers({ data, mutate }) {
       <div className="finance-summary">
         <article><span>Total contracte</span><strong>{money(planned)}</strong></article>
         <article><span>Platit / avansuri</span><strong>{money(paid)}</strong></article>
-        <article><span>De plata</span><strong>{money(remaining)}</strong></article>
+        <article><span>De plată</span><strong>{money(remaining)}</strong></article>
       </div>
       {canEdit ? <form className="entry-form suppliers-form" onSubmit={submit}>
         <input required placeholder="Furnizor" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} />
         <input placeholder="Telefon" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
         <input placeholder="Email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
-        <input type="number" min="0" placeholder="Avans platit" value={form.advance} onChange={(event) => setForm({ ...form, advance: event.target.value })} />
+        <input type="number" min="0" placeholder="Avans plătit" value={form.advance} onChange={(event) => setForm({ ...form, advance: event.target.value })} />
         <input type="number" min="0" placeholder="Total contract" value={form.total} onChange={(event) => setForm({ ...form, total: event.target.value })} />
         <label className="file-picker">
           <input type="file" accept=".pdf,.doc,.docx,image/*" onChange={(event) => setForm({ ...form, contract: event.target.files?.[0] || null })} />
           <span><FileText size={17} />{form.contract ? form.contract.name : "Alege contract"}</span>
         </label>
-        <button type="submit"><Plus size={18} />Adauga</button>
+        <button type="submit"><Plus size={18} />Adaugă</button>
       </form> : null}
-      <div className="filter-bar"><label><Search size={16} />Cauta<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Furnizor sau contact" /></label></div>
-      <div className="table-wrap"><table><thead><tr><th>Furnizor</th><th>Contact</th><th>Avans platit</th><th>Total</th><th>De plata</th><th>Contract</th><th></th></tr></thead><tbody>{rows.map((supplier) => {
+      <div className="filter-bar"><label><Search size={16} />Caută<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Furnizor sau contact" /></label></div>
+      <div className="table-wrap"><table><thead><tr><th>Furnizor</th><th>Contact</th><th>Avans plătit</th><th>Total</th><th>De plată</th><th>Contract</th><th></th></tr></thead><tbody>{rows.map((supplier) => {
         const isEditing = editSupplier?.id === supplier.id;
         return (
           <React.Fragment key={supplier.id}>
@@ -1322,8 +1525,8 @@ function Suppliers({ data, mutate }) {
               <td>
                 {canEdit ? (
                 <div className="row-actions">
-                  <button className="icon-button" onClick={() => startEditSupplier(supplier)} title="Editeaza" type="button"><Pencil size={17} /></button>
-                  <button className="icon-button danger" onClick={() => askDelete(`/api/suppliers/${supplier.id}`, `Stergi furnizorul ${supplier.name}?`)} type="button"><Trash2 size={17} /></button>
+                  <button className="icon-button" onClick={() => startEditSupplier(supplier)} title="Editează" type="button"><Pencil size={17} /></button>
+                  <button className="icon-button danger" onClick={() => askDelete(`/api/suppliers/${supplier.id}`, `Ștergi furnizorul ${supplier.name}?`)} type="button"><Trash2 size={17} /></button>
                 </div>
                 ) : null}
               </td>
@@ -1335,15 +1538,15 @@ function Suppliers({ data, mutate }) {
                     <input required placeholder="Furnizor" value={editSupplier.name} onChange={(event) => setEditSupplier({ ...editSupplier, name: event.target.value })} />
                     <input placeholder="Telefon" value={editSupplier.phone} onChange={(event) => setEditSupplier({ ...editSupplier, phone: event.target.value })} />
                     <input placeholder="Email" value={editSupplier.email} onChange={(event) => setEditSupplier({ ...editSupplier, email: event.target.value })} />
-                    <input type="number" min="0" placeholder="Avans platit" value={editSupplier.advance} onChange={(event) => setEditSupplier({ ...editSupplier, advance: event.target.value })} />
+                    <input type="number" min="0" placeholder="Avans plătit" value={editSupplier.advance} onChange={(event) => setEditSupplier({ ...editSupplier, advance: event.target.value })} />
                     <input type="number" min="0" placeholder="Total contract" value={editSupplier.total} onChange={(event) => setEditSupplier({ ...editSupplier, total: event.target.value })} />
-                    <input placeholder="Observatii" value={editSupplier.notes} onChange={(event) => setEditSupplier({ ...editSupplier, notes: event.target.value })} />
+                    <input placeholder="Observații" value={editSupplier.notes} onChange={(event) => setEditSupplier({ ...editSupplier, notes: event.target.value })} />
                     <label className="file-picker">
                       <input type="file" accept=".pdf,.doc,.docx,image/*" onChange={(event) => setEditSupplier({ ...editSupplier, contract: event.target.files?.[0] || null })} />
-                      <span><FileText size={17} />{editSupplier.contract ? editSupplier.contract.name : editSupplier.contract_name || "Schimba contract"}</span>
+                      <span><FileText size={17} />{editSupplier.contract ? editSupplier.contract.name : editSupplier.contract_name || "Schimbă contract"}</span>
                     </label>
-                    <button type="submit"><Check size={17} />Salveaza</button>
-                    <button className="tool-button" onClick={() => setEditSupplier(null)} type="button"><X size={17} />Anuleaza</button>
+                    <button type="submit"><Check size={17} />Salvează</button>
+                    <button className="tool-button" onClick={() => setEditSupplier(null)} type="button"><X size={17} />Anulează</button>
                   </form>
                 </td>
               </tr>
@@ -1357,15 +1560,15 @@ function Suppliers({ data, mutate }) {
 }
 
 function Tasks({ data, mutate }) {
-  const [form, setForm] = useState({ title: "", due: "", owner: "Amandoi", stage: "General", priority: "Medie" });
+  const [form, setForm] = useState({ title: "", due: "", owner: "Amândoi", stage: "General", priority: "Medie" });
   const [filters, setFilters] = useState({ search: "", done: "all" });
   const { askDelete, dialog } = useConfirmDelete(mutate);
   async function submit(event) {
     event.preventDefault();
     await mutate("/api/tasks", { method: "POST", body: JSON.stringify(form) });
-    setForm({ title: "", due: "", owner: "Amandoi", stage: "General", priority: "Medie" });
+    setForm({ title: "", due: "", owner: "Amândoi", stage: "General", priority: "Medie" });
   }
-  const groups = ["Invitatii", "Restaurant", "Furnizori", "Acte", "Saptamana nuntii", "General"];
+  const groups = ["Invitații", "Restaurant", "Furnizori", "Acte", "Săptămâna nunții", "General"];
   const tasks = data.tasks.filter((task) => {
     const matchesText = [task.title, task.owner, task.stage, task.priority].join(" ").toLowerCase().includes(filters.search.toLowerCase());
     const matchesDone = filters.done === "all" || (filters.done === "done" ? task.done : !task.done);
@@ -1373,17 +1576,17 @@ function Tasks({ data, mutate }) {
   });
   return (
     <section className="module">
-      <div className="module-title"><div><p className="eyebrow">Checklist</p><h2>Sarcini pe etape si deadline-uri</h2></div></div>
+      <div className="module-title"><div><p className="eyebrow">Checklist</p><h2>Sarcini pe etape și deadline-uri</h2></div></div>
       <form className="entry-form task-form" onSubmit={submit}>
         <input required placeholder="Sarcina" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />
         <input type="date" value={form.due} onChange={(event) => setForm({ ...form, due: event.target.value })} />
-        <select value={form.owner} onChange={(event) => setForm({ ...form, owner: event.target.value })}><option>Amandoi</option><option>Mireasa</option><option>Mire</option><option>Familie</option><option>Planner</option></select>
+        <select value={form.owner} onChange={(event) => setForm({ ...form, owner: event.target.value })}><option>Amândoi</option><option>Mireasă</option><option>Mire</option><option>Familie</option><option>Planner</option></select>
         <select value={form.stage} onChange={(event) => setForm({ ...form, stage: event.target.value })}>{groups.map((group) => <option key={group}>{group}</option>)}</select>
         <select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })}><option>Mica</option><option>Medie</option><option>Mare</option></select>
-        <button type="submit"><Plus size={18} />Adauga</button>
+        <button type="submit"><Plus size={18} />Adaugă</button>
       </form>
       <div className="filter-bar">
-        <label><Search size={16} />Cauta<input placeholder="Sarcina, responsabil, etapa" value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} /></label>
+        <label><Search size={16} />Caută<input placeholder="Sarcina, responsabil, etapa" value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} /></label>
         <label>Status<select value={filters.done} onChange={(event) => setFilters({ ...filters, done: event.target.value })}><option value="all">Toate</option><option value="open">Deschise</option><option value="done">Finalizate</option></select></label>
       </div>
       <div className="kanban">
@@ -1393,8 +1596,8 @@ function Tasks({ data, mutate }) {
             {tasks.filter((task) => task.stage === group).map((task) => (
               <article className={`task-card ${task.done ? "done" : ""}`} key={task.id}>
                 <input checked={task.done} onChange={(event) => mutate(`/api/tasks/${task.id}`, { method: "PATCH", body: JSON.stringify({ done: event.target.checked }) })} type="checkbox" />
-                <div><strong>{task.title}</strong><small>{task.due || "fara termen"} - {task.owner} - {task.priority}</small></div>
-                <button className="icon-button danger" onClick={() => askDelete(`/api/tasks/${task.id}`, `Stergi sarcina ${task.title}?`)} type="button"><Trash2 size={17} /></button>
+                <div><strong>{task.title}</strong><small>{task.due || "fără termen"} - {task.owner} - {task.priority}</small></div>
+                <button className="icon-button danger" onClick={() => askDelete(`/api/tasks/${task.id}`, `Ștergi sarcina ${task.title}?`)} type="button"><Trash2 size={17} /></button>
               </article>
             ))}
           </section>
@@ -1405,13 +1608,16 @@ function Tasks({ data, mutate }) {
   );
 }
 
-function CalendarView({ data, mutate }) {
-  const [form, setForm] = useState({ title: "", due: "", owner: "Amandoi", stage: "General", priority: "Medie" });
+function CalendarView({ data, mutate, searchQuery = "" }) {
+  const [form, setForm] = useState({ title: "", due: "", owner: "Amândoi", stage: "General", priority: "Medie" });
   const [filters, setFilters] = useState({ search: "", done: "all" });
   const [month, setMonth] = useState((data.wedding.wedding_date || new Date().toISOString().slice(0, 10)).slice(0, 7));
   const { askDelete, dialog } = useConfirmDelete(mutate);
   const canEdit = canRole(data.wedding.role, "planner");
-  const groups = ["Invitatii", "Restaurant", "Furnizori", "Acte", "Saptamana nuntii", "General"];
+  useEffect(() => {
+    setFilters((current) => ({ ...current, search: searchQuery }));
+  }, [searchQuery]);
+  const groups = ["Invitații", "Restaurant", "Furnizori", "Acte", "Săptămâna nunții", "General"];
   const events = [
     ...(data.wedding.wedding_date ? [{ date: data.wedding.wedding_date, title: `Nunta ${data.wedding.couple}`, type: "Eveniment" }] : []),
     ...data.tasks.filter((task) => task.due).map((task) => ({ date: task.due, title: task.title, type: task.done ? "Finalizat" : "Task", meta: `${task.owner} - ${task.stage}` })),
@@ -1438,7 +1644,7 @@ function CalendarView({ data, mutate }) {
   async function submit(event) {
     event.preventDefault();
     await mutate("/api/tasks", { method: "POST", body: JSON.stringify(form) });
-    setForm({ title: "", due: "", owner: "Amandoi", stage: "General", priority: "Medie" });
+    setForm({ title: "", due: "", owner: "Amândoi", stage: "General", priority: "Medie" });
   }
 
   function shiftMonth(direction) {
@@ -1448,14 +1654,14 @@ function CalendarView({ data, mutate }) {
 
   return (
     <section className="module">
-      <div className="module-title"><div><p className="eyebrow">Calendar</p><h2>Calendar si checklist</h2></div></div>
+      <div className="module-title"><div><p className="eyebrow">Calendar</p><h2>Calendar și checklist</h2></div></div>
       {canEdit ? <form className="entry-form task-form" onSubmit={submit}>
         <input required placeholder="Sarcina" value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} />
         <input type="date" value={form.due} onChange={(event) => setForm({ ...form, due: event.target.value })} />
-        <select value={form.owner} onChange={(event) => setForm({ ...form, owner: event.target.value })}><option>Amandoi</option><option>Mireasa</option><option>Mire</option><option>Familie</option><option>Planner</option></select>
+        <select value={form.owner} onChange={(event) => setForm({ ...form, owner: event.target.value })}><option>Amândoi</option><option>Mireasă</option><option>Mire</option><option>Familie</option><option>Planner</option></select>
         <select value={form.stage} onChange={(event) => setForm({ ...form, stage: event.target.value })}>{groups.map((group) => <option key={group}>{group}</option>)}</select>
         <select value={form.priority} onChange={(event) => setForm({ ...form, priority: event.target.value })}><option>Mica</option><option>Medie</option><option>Mare</option></select>
-        <button type="submit"><Plus size={18} />Adauga</button>
+        <button type="submit"><Plus size={18} />Adaugă</button>
       </form> : null}
       <div className="calendar-toolbar">
         <button className="tool-button" onClick={() => shiftMonth(-1)} type="button">Luna trecuta</button>
@@ -1472,15 +1678,15 @@ function CalendarView({ data, mutate }) {
         ) : <span className="calendar-day muted" key={`empty-${index}`} />)}
       </div>
       <div className="filter-bar">
-        <label><Search size={16} />Cauta<input placeholder="Sarcina, responsabil, etapa" value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} /></label>
+        <label><Search size={16} />Caută<input placeholder="Sarcina, responsabil, etapa" value={filters.search} onChange={(event) => setFilters({ ...filters, search: event.target.value })} /></label>
         <label>Status<select value={filters.done} onChange={(event) => setFilters({ ...filters, done: event.target.value })}><option value="all">Toate</option><option value="open">Deschise</option><option value="done">Finalizate</option></select></label>
       </div>
       <div className="task-list">
         {tasks.map((task) => (
           <article className={`task-card ${task.done ? "done" : ""}`} key={task.id}>
             <input checked={task.done} disabled={!canEdit} onChange={(event) => mutate(`/api/tasks/${task.id}`, { method: "PATCH", body: JSON.stringify({ done: event.target.checked }) })} type="checkbox" />
-            <div><strong>{task.title}</strong><small>{task.due || "fara termen"} - {task.owner} - {task.stage} - {task.priority}</small></div>
-            {canEdit ? <button className="icon-button danger" onClick={() => askDelete(`/api/tasks/${task.id}`, `Stergi sarcina ${task.title}?`)} type="button"><Trash2 size={17} /></button> : null}
+            <div><strong>{task.title}</strong><small>{task.due || "fără termen"} - {task.owner} - {task.stage} - {task.priority}</small></div>
+            {canEdit ? <button className="icon-button danger" onClick={() => askDelete(`/api/tasks/${task.id}`, `Ștergi sarcina ${task.title}?`)} type="button"><Trash2 size={17} /></button> : null}
           </article>
         ))}
       </div>
@@ -1491,17 +1697,17 @@ function CalendarView({ data, mutate }) {
 
 function Exports() {
   const exports = [
-    ["guests", "Invitati complet"],
-    ["menu", "Meniuri si alergii"],
-    ["tables", "Asezare mese"],
-    ["tables-pdf", "Asezare mese PDF"],
+    ["guests", "Invitați complet"],
+    ["menu", "Meniuri și alergii"],
+    ["tables", "Așezare mese"],
+    ["tables-pdf", "Așezare mese PDF"],
     ["budget", "Buget"]
   ];
   return (
     <section className="module">
       <div className="module-title"><div><p className="eyebrow">Export</p><h2>Fisiere CSV pentru Excel</h2></div></div>
       <div className="export-grid">
-        {exports.map(([key, label]) => <a className="export-card" href={`/api/export/${key}`} key={key}><Download size={22} /><strong>{label}</strong><small>{key.endsWith("pdf") ? "Descarca PDF" : "Descarca CSV"}</small></a>)}
+        {exports.map(([key, label]) => <a className="export-card" href={`/api/export/${key}`} key={key}><Download size={22} /><strong>{label}</strong><small>{key.endsWith("pdf") ? "Descarcă PDF" : "Descarcă CSV"}</small></a>)}
       </div>
     </section>
   );
@@ -1536,16 +1742,16 @@ function MediaQr({ data }) {
   return (
     <section className="module media-layout qr-media-section">
       <div className="qr-media-intro">
-        <p className="eyebrow">Poze si video</p>
-        <h2>Cod QR pentru upload de la invitati</h2>
-        <p className="hint">Linkul public duce la pagina unde invitatii pot incarca poze si video-uri dupa eveniment.</p>
+        <p className="eyebrow">Poze și video</p>
+        <h2>Cod QR pentru upload de la invitați</h2>
+        <p className="hint">Linkul public duce la pagina unde invitații pot încărca poze și video-uri după eveniment.</p>
         <div className="row-actions qr-actions">
           <a className="tool-button" href={data.mediaUrl} target="_blank" rel="noreferrer"><ImageUp size={17} />Deschide pagina</a>
           <button className="tool-button" onClick={() => navigator.clipboard.writeText(data.mediaUrl)} type="button"><Copy size={17} />Copiaza link</button>
-          {qr ? <a className="tool-button whatsapp" href={qr} download="qr-upload-poze.png"><Download size={17} />Descarca QR</a> : null}
+          {qr ? <a className="tool-button whatsapp" href={qr} download="qr-upload-poze.png"><Download size={17} />Descarcă QR</a> : null}
         </div>
       </div>
-      <div className="qr-box">{qr ? <img src={qr} alt="QR upload poze si video" /> : <div className="loader" />}</div>
+      <div className="qr-box">{qr ? <img src={qr} alt="QR upload poze și video" /> : <div className="loader" />}</div>
     </section>
   );
 }
@@ -1564,8 +1770,8 @@ function Photos({ data }) {
   return (
     <section className="module">
       <div className="module-title">
-        <div><p className="eyebrow">Galerie</p><h2>Poze si video-uri primite</h2></div>
-        <a className="tool-button" href="/api/media-uploads/zip"><FileArchive size={17} />Descarca ZIP</a>
+        <div><p className="eyebrow">Galerie</p><h2>Poze și video-uri primite</h2></div>
+        <a className="tool-button" href="/api/media-uploads/zip"><FileArchive size={17} />Descarcă ZIP</a>
       </div>
       <div className="photo-grid">
         {data.notifications?.newUploads ? <p className="notification-box"><Bell size={18} />Ai {data.notifications.newUploads} uploaduri noi.</p> : null}
@@ -1580,11 +1786,11 @@ function Photos({ data }) {
               <button className="tool-button" onClick={() => setActiveIndex(index)} type="button"><Eye size={16} />Vizualizeaza</button>
             </div>
           </article>
-        )) : <p className="empty-state">Nu exista uploaduri inca.</p>}
+        )) : <p className="empty-state">Nu există uploaduri încă.</p>}
       </div>
       {activeUpload ? (
         <div className="lightbox" role="dialog" aria-modal="true">
-          <button className="lightbox-close" onClick={() => setActiveIndex(null)} type="button">Inchide</button>
+          <button className="lightbox-close" onClick={() => setActiveIndex(null)} type="button">Închide</button>
           <button className="lightbox-nav left" onClick={() => moveLightbox(-1)} type="button">‹</button>
           <div className="lightbox-media">
             {activeUpload.mime_type.startsWith("image/") ? <img src={activeUpload.url} alt={activeUpload.file_name} /> : <video src={activeUpload.url} controls autoPlay />}
@@ -1627,7 +1833,7 @@ function Team({ data, mutate }) {
       <div className="settings-header">
         <p className="eyebrow">Roluri</p>
         <h2>Acces pentru colaboratori</h2>
-        <p className="hint">Creezi conturi de planner sau vizualizare. Emailul trebuie sa fie unic in platforma.</p>
+        <p className="hint">Creezi conturi de planner sau vizualizare. Emailul trebuie să fie unic în platformă.</p>
       </div>
       <div className="team-grid">
         <form className="settings-form team-form-card" onSubmit={submit}>
@@ -1637,7 +1843,7 @@ function Team({ data, mutate }) {
           <label>Email<input required type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label>
           <label>Parola<input required minLength="6" type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} /></label>
           <label>Rol<select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })}><option value="planner">Planner</option><option value="viewer">Vizualizare</option></select></label>
-          <button className="settings-save" type="submit"><UserPlus size={18} />Creeaza cont</button>
+          <button className="settings-save" type="submit"><UserPlus size={18} />Creează cont</button>
         </form>
         <div className="team-list">
           {data.team.map((member) => (
@@ -1648,7 +1854,7 @@ function Team({ data, mutate }) {
               </div>
               <div className="row-actions">
                 <span className="pill">{member.role === "owner" ? "Miri" : member.role === "planner" ? "Planner" : "Vizualizare"}</span>
-                {member.role !== "owner" ? <button className="icon-button" onClick={() => startEditMember(member)} title="Editeaza cont" type="button"><Pencil size={17} /></button> : null}
+                {member.role !== "owner" ? <button className="icon-button" onClick={() => startEditMember(member)} title="Editează cont" type="button"><Pencil size={17} /></button> : null}
               </div>
             </article>
           ))}
@@ -1658,16 +1864,16 @@ function Team({ data, mutate }) {
         <div className="confirm-backdrop" role="dialog" aria-modal="true">
           <section className="confirm-dialog edit-dialog">
             <button className="modal-close" onClick={() => setEditMember(null)} type="button"><X size={18} /></button>
-            <h2>Editeaza cont</h2>
+            <h2>Editează cont</h2>
             <form className="inline-edit-form team-edit-form" onSubmit={saveMember}>
               <label>Nume<input value={editMember.first_name} onChange={(event) => setEditMember({ ...editMember, first_name: event.target.value })} /></label>
               <label>Prenume<input value={editMember.last_name} onChange={(event) => setEditMember({ ...editMember, last_name: event.target.value })} /></label>
               <label>Telefon<input value={editMember.phone} onChange={(event) => setEditMember({ ...editMember, phone: event.target.value })} /></label>
               <label>Email<input required type="email" value={editMember.email} onChange={(event) => setEditMember({ ...editMember, email: event.target.value })} /></label>
               <label>Rol<select value={editMember.role} onChange={(event) => setEditMember({ ...editMember, role: event.target.value })}><option value="planner">Planner</option><option value="viewer">Vizualizare</option></select></label>
-              <label>Parola noua<input minLength="6" placeholder="Lasa gol daca nu schimbi" type="password" value={editMember.password} onChange={(event) => setEditMember({ ...editMember, password: event.target.value })} /></label>
-              <button type="submit"><Check size={17} />Salveaza</button>
-              <button className="tool-button" onClick={() => setEditMember(null)} type="button"><X size={17} />Anuleaza</button>
+              <label>Parola noua<input minLength="6" placeholder="Lasă gol dacă nu schimbi" type="password" value={editMember.password} onChange={(event) => setEditMember({ ...editMember, password: event.target.value })} /></label>
+              <button type="submit"><Check size={17} />Salvează</button>
+              <button className="tool-button" onClick={() => setEditMember(null)} type="button"><X size={17} />Anulează</button>
             </form>
           </section>
         </div>
@@ -1681,10 +1887,15 @@ function InvitationSettings({ data, mutate }) {
   const [uploadingHero, setUploadingHero] = useState("");
   const [saved, setSaved] = useState(false);
   const [menuDraft, setMenuDraft] = useState("");
-  useEffect(() => setForm(data.wedding), [data.wedding]);
+  useEffect(() => {
+    const templateExists = invitationTemplates.some((template) => template.key === data.wedding.invitation_template);
+    setForm({ ...data.wedding, invitation_template: templateExists ? data.wedding.invitation_template : "custom" });
+  }, [data.wedding]);
   const program = Array.isArray(form.program) ? form.program : [];
   const menuOptions = Array.isArray(form.menu_options) ? form.menu_options : [];
   const currentTemplate = invitationTemplates.find((template) => template.key === (form.invitation_template || "custom")) || invitationTemplates[0];
+  const t1 = template1Design(form);
+  const t2 = template2Design(form);
   const previewUrl = data.guests[0]?.inviteUrl || data.wedding.publicInviteUrl || "";
   function setProgram(index, key, value) {
     setSaved(false);
@@ -1701,6 +1912,12 @@ function InvitationSettings({ data, mutate }) {
   function updateForm(next) {
     setSaved(false);
     setForm(next);
+  }
+  function updateTemplate2(key, value) {
+    updateForm({ ...form, invitation_design: { ...t2, [key]: value } });
+  }
+  function updateTemplate1(key, value) {
+    updateForm({ ...form, invitation_design: { ...t1, [key]: value } });
   }
   function addMenuOption() {
     const value = menuDraft.trim();
@@ -1719,12 +1936,21 @@ function InvitationSettings({ data, mutate }) {
     await mutate("/api/hero-upload", { method: "POST", body: JSON.stringify({ dataUrl, name: file.name, slot: slot === "secondary" ? "secondary" : "hero" }) });
     setUploadingHero("");
   }
+  async function uploadTemplatePhoto(event, key) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setUploadingHero(key);
+    const dataUrl = await fileToDataUrl(file);
+    const payload = await api("/api/invitation-design-upload", { method: "POST", body: JSON.stringify({ dataUrl, name: file.name, key }) });
+    updateForm({ ...form, invitation_design: { ...t2, [key]: payload.url } });
+    setUploadingHero("");
+  }
   return (
     <section className="module settings-page">
-      <div className="settings-header"><p className="eyebrow">Invitatie</p><h2>Pagina publica si RSVP</h2></div>
+      <div className="settings-header"><p className="eyebrow">Invitație</p><h2>Pagina publică și RSVP</h2></div>
       <form className="settings-form settings-card" onSubmit={submit}>
         <fieldset>
-          <legend>Invitatie - Template pagina</legend>
+          <legend>Invitație - Template pagina</legend>
           <div className="template-picker">
             {invitationTemplates.map((template) => (
               <button className={form.invitation_template === template.key || (!form.invitation_template && template.key === "custom") ? "selected" : ""} key={template.key} onClick={() => updateForm({ ...form, invitation_template: template.key })} type="button">
@@ -1736,18 +1962,126 @@ function InvitationSettings({ data, mutate }) {
           {previewUrl ? (
             <div className="invite-preview-box">
               <div>
-                <strong>Previzualizare invitatie</strong>
-                <small>Se deschide cu datele si imaginile salvate pentru primul invitat din lista.</small>
+                <strong>Previzualizare invitație</strong>
+                <small>Se deschide cu datele și imaginile salvate pentru primul invitat din listă.</small>
               </div>
               <a className="tool-button" href={previewUrl} target="_blank" rel="noreferrer"><Eye size={17} />Previzualizeaza</a>
             </div>
-          ) : <p className="hint">Adauga cel putin un invitat ca sa poti previzualiza pagina publica.</p>}
+          ) : <p className="hint">Adaugă cel putin un invitat ca sa poti previzualiza pagina publica.</p>}
         </fieldset>
+        {(!form.invitation_template || form.invitation_template === "custom" || !invitationTemplates.some((template) => template.key === form.invitation_template)) ? (
+          <fieldset>
+            <legend>Template 1 - Culori și texte</legend>
+            <div className="template-customizer-preview tpl1-preview" style={{
+              "--preview-bg": t1.background,
+              "--preview-text": t1.text,
+              "--preview-muted": t1.muted,
+              "--preview-accent": t1.accent,
+              "--preview-card": t1.card,
+              "--preview-border": t1.border
+            }}>
+              <div>
+                <span>{t1.heroKicker}</span>
+                <strong>{form.couple || "Mireasă & Mire"}</strong>
+                <small>{t1.rsvpKicker} · {t1.rsvpTitle}</small>
+              </div>
+              <i />
+            </div>
+            <div className="settings-grid four color-grid">
+              <label>Fundal<input type="color" value={t1.background} onChange={(event) => updateTemplate1("background", event.target.value)} /></label>
+              <label>Text<input type="color" value={t1.text} onChange={(event) => updateTemplate1("text", event.target.value)} /></label>
+              <label>Accent<input type="color" value={t1.accent} onChange={(event) => updateTemplate1("accent", event.target.value)} /></label>
+              <label>Overlay jos<input type="color" value={t1.darkOverlay} onChange={(event) => updateTemplate1("darkOverlay", event.target.value)} /></label>
+              <label>Text secundar<input type="color" value={t1.muted} onChange={(event) => updateTemplate1("muted", event.target.value)} /></label>
+              <label>Carduri<input type="color" value={t1.card} onChange={(event) => updateTemplate1("card", event.target.value)} /></label>
+              <label>Border<input type="color" value={t1.border} onChange={(event) => updateTemplate1("border", event.target.value)} /></label>
+            </div>
+            <div className="settings-grid two">
+              <label>Text mic hero<input value={t1.heroKicker} onChange={(event) => updateTemplate1("heroKicker", event.target.value)} /></label>
+              <label>Text scroll<input value={t1.scrollText} onChange={(event) => updateTemplate1("scrollText", event.target.value)} /></label>
+              <label>Text mic detalii<input value={t1.detailsKicker} onChange={(event) => updateTemplate1("detailsKicker", event.target.value)} /></label>
+              <label>Titlu detalii<input value={t1.detailsTitle} onChange={(event) => updateTemplate1("detailsTitle", event.target.value)} /></label>
+              <label>Buton hartă<input value={t1.mapButton} onChange={(event) => updateTemplate1("mapButton", event.target.value)} /></label>
+              <label>Text mic dress code<input value={t1.dressKicker} onChange={(event) => updateTemplate1("dressKicker", event.target.value)} /></label>
+              <label>Titlu dress code<input value={t1.dressTitle} onChange={(event) => updateTemplate1("dressTitle", event.target.value)} /></label>
+              <label>Titlu program<input value={t1.programTitle} onChange={(event) => updateTemplate1("programTitle", event.target.value)} /></label>
+              <label>Text mic RSVP<input value={t1.rsvpKicker} onChange={(event) => updateTemplate1("rsvpKicker", event.target.value)} /></label>
+              <label>Titlu RSVP<input value={t1.rsvpTitle} onChange={(event) => updateTemplate1("rsvpTitle", event.target.value)} /></label>
+              <label>Text footer<input value={t1.footerText} onChange={(event) => updateTemplate1("footerText", event.target.value)} /></label>
+              <label>Text dress code<textarea value={t1.dressText} onChange={(event) => updateTemplate1("dressText", event.target.value)} /></label>
+            </div>
+          </fieldset>
+        ) : null}
+        {form.invitation_template === "figma-landing" ? (
+          <fieldset>
+            <legend>Template 2 - Culori și texte</legend>
+            <div className="template-customizer-preview" style={{
+              "--preview-bg": t2.background,
+              "--preview-text": t2.text,
+              "--preview-muted": t2.muted,
+              "--preview-accent": t2.accent,
+              "--preview-card": t2.card,
+              "--preview-border": t2.border
+            }}>
+              <div>
+                <span>{t2.heroKicker}</span>
+                <strong>{t2.heroTitle}</strong>
+                <small>{t2.rsvpKicker} · {t2.rsvpTitle}</small>
+              </div>
+              <i />
+            </div>
+            <div className="settings-grid four color-grid">
+              <label>Fundal<input type="color" value={t2.background} onChange={(event) => updateTemplate2("background", event.target.value)} /></label>
+              <label>Text<input type="color" value={t2.text} onChange={(event) => updateTemplate2("text", event.target.value)} /></label>
+              <label>Accent<input type="color" value={t2.accent} onChange={(event) => updateTemplate2("accent", event.target.value)} /></label>
+              <label>Bandă jos<input type="color" value={t2.darkBand} onChange={(event) => updateTemplate2("darkBand", event.target.value)} /></label>
+              <label>Text secundar<input type="color" value={t2.muted} onChange={(event) => updateTemplate2("muted", event.target.value)} /></label>
+              <label>Carduri<input type="color" value={t2.card} onChange={(event) => updateTemplate2("card", event.target.value)} /></label>
+              <label>Border<input type="color" value={t2.border} onChange={(event) => updateTemplate2("border", event.target.value)} /></label>
+            </div>
+            <div className="settings-grid two">
+              <label>Text mic hero<input value={t2.heroKicker} onChange={(event) => updateTemplate2("heroKicker", event.target.value)} /></label>
+              <label>Titlu hero<textarea value={t2.heroTitle} onChange={(event) => updateTemplate2("heroTitle", event.target.value)} /></label>
+              <label>Titlu galerie foto<input value={t2.photosTitle} onChange={(event) => updateTemplate2("photosTitle", event.target.value)} /></label>
+              <label>Text mic locație<input value={t2.venueKicker} onChange={(event) => updateTemplate2("venueKicker", event.target.value)} /></label>
+              <label>Titlu servicii<input value={t2.servicesTitle} onChange={(event) => updateTemplate2("servicesTitle", event.target.value)} /></label>
+              <label>Titlu galerie<input value={t2.galleryTitle} onChange={(event) => updateTemplate2("galleryTitle", event.target.value)} /></label>
+              <label>Text mic RSVP<input value={t2.rsvpKicker} onChange={(event) => updateTemplate2("rsvpKicker", event.target.value)} /></label>
+              <label>Titlu RSVP<input value={t2.rsvpTitle} onChange={(event) => updateTemplate2("rsvpTitle", event.target.value)} /></label>
+            </div>
+            <div className="settings-grid three">
+              <label>Serviciu 1<input value={t2.serviceOne} onChange={(event) => updateTemplate2("serviceOne", event.target.value)} /></label>
+              <label>Serviciu 2<input value={t2.serviceTwo} onChange={(event) => updateTemplate2("serviceTwo", event.target.value)} /></label>
+              <label>Serviciu 3<input value={t2.serviceThree} onChange={(event) => updateTemplate2("serviceThree", event.target.value)} /></label>
+            </div>
+            <div className="settings-grid two">
+              <label>Text mic testimonial<input value={t2.testimonialKicker} onChange={(event) => updateTemplate2("testimonialKicker", event.target.value)} /></label>
+              <label>Text testimonial<textarea value={t2.testimonialText} onChange={(event) => updateTemplate2("testimonialText", event.target.value)} /></label>
+            </div>
+            <div className="settings-grid five compact-inputs template-photo-upload-grid">
+              {[
+                ["photoOne", "Poza 1"],
+                ["photoTwo", "Poza 2"],
+                ["photoThree", "Poza 3"],
+                ["photoFour", "Poza 4"],
+                ["photoFive", "Poza 5"]
+              ].map(([key, label]) => (
+                <label className="file-field template-photo-field" key={key}>{label}
+                  <span className="file-picker">
+                    <input type="file" accept="image/*" onChange={(event) => uploadTemplatePhoto(event, key)} />
+                    <span><ImageUp size={17} />Încarcă</span>
+                  </span>
+                  {t2[key] ? <img src={t2[key]} alt="" /> : null}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+        ) : null}
         <fieldset>
-          <legend>Invitatie - Detalii eveniment</legend>
+          <legend>Invitație - Detalii eveniment</legend>
           <div className="settings-grid two">
-            <label>Mireasa & Mire<input value={form.couple || ""} onChange={(event) => updateForm({ ...form, couple: event.target.value })} /></label>
-            <label>Locatie<input value={form.venue || ""} onChange={(event) => updateForm({ ...form, venue: event.target.value })} /></label>
+            <label>Mireasă & Mire<input value={form.couple || ""} onChange={(event) => updateForm({ ...form, couple: event.target.value })} /></label>
+            <label>Locație<input value={form.venue || ""} onChange={(event) => updateForm({ ...form, venue: event.target.value })} /></label>
             <label>Data nuntii<input type="date" value={form.wedding_date || ""} onChange={(event) => updateForm({ ...form, wedding_date: event.target.value })} /></label>
             <label>Ora nuntii<input type="time" value={form.wedding_time || ""} onChange={(event) => updateForm({ ...form, wedding_time: event.target.value })} /></label>
             <label>Adresa<input value={form.venue_address || ""} onChange={(event) => updateForm({ ...form, venue_address: event.target.value })} /></label>
@@ -1759,30 +2093,30 @@ function InvitationSettings({ data, mutate }) {
         </fieldset>
 
         <fieldset>
-          <legend>Invitatie - Imagini</legend>
+          <legend>Invitație - Imagini</legend>
           <div className="settings-grid">
             <label className="file-field">Media sus in pagina ({currentTemplate.resolution})
               <span className="file-picker">
                 <input type="file" accept="image/*,video/*" onChange={(event) => uploadHero(event, "hero")} />
-                <span><ImageUp size={17} />Incarca poza sau video sus</span>
+                <span><ImageUp size={17} />Încarcă poza sau video sus</span>
               </span>
             </label>
             <label className="file-field">Media jos in pagina ({currentTemplate.secondaryResolution})
               <span className="file-picker">
                 <input type="file" accept="image/*,video/*" onChange={(event) => uploadHero(event, "secondary")} />
-                <span><ImageUp size={17} />Incarca poza sau video jos</span>
+                <span><ImageUp size={17} />Încarcă poza sau video jos</span>
               </span>
             </label>
           </div>
-          {uploadingHero ? <p className="hint">Se incarca {uploadingHero === "secondary" ? "media de jos" : "media de sus"}...</p> : null}
+          {uploadingHero ? <p className="hint">Se încarcă {uploadingHero === "secondary" ? "media de jos" : "media de sus"}...</p> : null}
         </fieldset>
 
         <fieldset>
-          <legend>Invitatie - Texte si meniu</legend>
-          <label>Text invitatie<textarea value={form.invite_intro || ""} onChange={(event) => updateForm({ ...form, invite_intro: event.target.value })} /></label>
+          <legend>Invitație - Texte și meniu</legend>
+          <label>Text invitație<textarea value={form.invite_intro || ""} onChange={(event) => updateForm({ ...form, invite_intro: event.target.value })} /></label>
           <label>Mesaj WhatsApp<textarea value={form.whatsapp_message || ""} onChange={(event) => updateForm({ ...form, whatsapp_message: event.target.value })} /></label>
           <div className="menu-builder">
-            <span>Optiuni meniu pentru invitati</span>
+            <span>Opțiuni meniu pentru invitați</span>
             <div className="menu-builder-row">
               <input placeholder="Ex: Vita, Peste, Vegetarian" value={menuDraft} onChange={(event) => setMenuDraft(event.target.value)} onKeyDown={(event) => {
                 if (event.key === "Enter") {
@@ -1790,29 +2124,29 @@ function InvitationSettings({ data, mutate }) {
                   addMenuOption();
                 }
               }} />
-              <button type="button" onClick={addMenuOption}><Plus size={17} />Adauga meniu</button>
+              <button type="button" onClick={addMenuOption}><Plus size={17} />Adaugă meniu</button>
             </div>
             <div className="menu-option-list">
-              {menuOptions.length ? menuOptions.map((option) => <button key={option} onClick={() => removeMenuOption(option)} type="button">{option}<Trash2 size={14} /></button>) : <small>Adauga cel putin un meniu ca invitatii sa poata alege.</small>}
+              {menuOptions.length ? menuOptions.map((option) => <button key={option} onClick={() => removeMenuOption(option)} type="button">{option}<Trash2 size={14} /></button>) : <small>Adaugă cel puțin un meniu ca invitații să poată alege.</small>}
             </div>
           </div>
         </fieldset>
 
         <fieldset>
-          <legend>Invitatie - Programul zilei</legend>
+          <legend>Invitație - Programul zilei</legend>
           <div className="program-editor">
             {program.map((item, index) => (
               <div className="program-row" key={index}>
                 <input value={item.time || ""} placeholder="Ora" onChange={(event) => setProgram(index, "time", event.target.value)} />
                 <input value={item.title || ""} placeholder="Moment" onChange={(event) => setProgram(index, "title", event.target.value)} />
-                <button type="button" onClick={() => updateForm({ ...form, program: program.filter((_, itemIndex) => itemIndex !== index) })}>Sterge</button>
+                <button type="button" onClick={() => updateForm({ ...form, program: program.filter((_, itemIndex) => itemIndex !== index) })}>Șterge</button>
               </div>
             ))}
-            <button type="button" onClick={() => updateForm({ ...form, program: [...program, { time: "", title: "" }] })}>Adauga moment</button>
+            <button type="button" onClick={() => updateForm({ ...form, program: [...program, { time: "", title: "" }] })}>Adaugă moment</button>
           </div>
         </fieldset>
-        {saved ? <p className="save-notice"><Check size={18} />Setarile au fost salvate.</p> : null}
-        <button className="settings-save" type="submit">Salveaza setarile</button>
+        {saved ? <p className="save-notice"><Check size={18} />Setările au fost salvate.</p> : null}
+        <button className="settings-save" type="submit">Salvează setările</button>
       </form>
     </section>
   );
@@ -1862,12 +2196,12 @@ function SettingsPanel({ data, mutate }) {
   }
   return (
     <section className="module settings-page">
-      <div className="settings-header"><p className="eyebrow">Setari</p><h2>Design platforma si profil</h2></div>
+      <div className="settings-header"><p className="eyebrow">Setări</p><h2>Design platformă și profil</h2></div>
       <form className="settings-form settings-card" onSubmit={submit}>
         <fieldset>
           <legend>Platforma - Design intern</legend>
           <div className="settings-choice-block">
-            <span>Tema platforma</span>
+            <span>Tema platformă</span>
             <div className="theme-dots">
               {platformThemes.map((theme) => (
                 <button className={form.theme_color === theme.key ? "selected" : ""} key={theme.key} onClick={() => updateForm({ ...form, theme_color: theme.key })} type="button">
@@ -1878,26 +2212,26 @@ function SettingsPanel({ data, mutate }) {
             </div>
           </div>
           <div className={`platform-preview theme-${form.theme_color || "sage"}`}>
-            <aside><span /> <strong>{form.couple || "Mireasa & Mire"}</strong></aside>
-            <main><b>Preview platforma</b><small>Carduri, meniuri si formulare</small></main>
+            <aside><span /> <strong>{form.couple || "Mireasă & Mire"}</strong></aside>
+            <main><b>Preview platformă</b><small>Carduri, meniuri și formulare</small></main>
           </div>
         </fieldset>
         <fieldset>
           <legend>Profil</legend>
           <div className="settings-grid two">
-            <label>Mireasa & Mire<input value={form.couple || ""} onChange={(event) => updateForm({ ...form, couple: event.target.value })} /></label>
-            <label>Locatie<input value={form.venue || ""} onChange={(event) => updateForm({ ...form, venue: event.target.value })} /></label>
+            <label>Mireasă & Mire<input value={form.couple || ""} onChange={(event) => updateForm({ ...form, couple: event.target.value })} /></label>
+            <label>Locație<input value={form.venue || ""} onChange={(event) => updateForm({ ...form, venue: event.target.value })} /></label>
             <label className="file-field">Poza de profil cu mirii
               <span className="file-picker">
                 <input type="file" accept="image/*" onChange={uploadProfile} />
-                <span><ImageUp size={17} />Incarca poza de profil</span>
+                <span><ImageUp size={17} />Încarcă poza de profil</span>
               </span>
             </label>
           </div>
-          {uploadingProfile ? <p className="hint">Se incarca poza de profil...</p> : null}
+          {uploadingProfile ? <p className="hint">Se încarcă poza de profil...</p> : null}
         </fieldset>
-        {saved ? <p className="save-notice"><Check size={18} />Setarile au fost salvate.</p> : null}
-        <button className="settings-save" type="submit">Salveaza setarile</button>
+        {saved ? <p className="save-notice"><Check size={18} />Setările au fost salvate.</p> : null}
+        <button className="settings-save" type="submit">Salvează setările</button>
       </form>
     </section>
   );
@@ -1913,7 +2247,7 @@ function InvitationPage({ token }) {
     api(`/api/invite/${token}`).then((payload) => {
       setData(payload);
       setForm({
-        status: payload.guest.status === "In asteptare" ? "Confirmat" : payload.guest.status || "Confirmat",
+        status: payload.guest.status === "În așteptare" ? "Confirmat" : payload.guest.status || "Confirmat",
         seats: payload.guest.seats || 1,
         meal_choice: payload.guest.meal_choice || "",
         meal_choices: mealChoicesForSeats(payload.guest.meal_choices, payload.guest.seats || 1, payload.guest.meal_choice || ""),
@@ -1927,7 +2261,7 @@ function InvitationPage({ token }) {
   if (!data) return <ScreenLoader />;
 
   const wedding = data.wedding;
-  const locked = saved || data.guest.status !== "In asteptare";
+  const locked = saved || data.guest.status !== "În așteptare";
   const menuOptions = Array.isArray(wedding.menu_options) && wedding.menu_options.length ? wedding.menu_options : ["Carne", "Peste", "Vegetarian", "Copil"];
   const seatCount = normalizeSeatCount(form.seats);
   function updateSeats(value) {
@@ -1941,7 +2275,7 @@ function InvitationPage({ token }) {
   }
   const mealChoiceFields = (
     <div className="meal-choice-group">
-      <span>Meniu pentru fiecare persoana</span>
+      <span>Meniu pentru fiecare persoană</span>
       {mealChoicesForSeats(form.meal_choices, seatCount, form.meal_choice).map((choice, index) => (
         <label key={index}>Persoana {index + 1}
           <select value={choice} onChange={(event) => updateMealChoice(index, event.target.value)}>
@@ -1957,32 +2291,35 @@ function InvitationPage({ token }) {
   const details = (
     <div className="invite-facts">
       <span><CalendarDays size={18} />{dateLabel(wedding.wedding_date)}{wedding.wedding_time ? `, ora ${wedding.wedding_time}` : ""}</span>
-      <span><MapPin size={18} />Ceremonie: {wedding.venue || "Locatie necompletata"}</span>
-      <span><MapPin size={18} />Petrecere: {wedding.venue || "Locatie necompletata"}</span>
+      <span><MapPin size={18} />Ceremonie: {wedding.venue || "Locație necompletată"}</span>
+      <span><MapPin size={18} />Petrecere: {wedding.venue || "Locație necompletată"}</span>
       <span><Shirt size={18} />{wedding.dress_code || "Dress code liber"}</span>
     </div>
   );
   const programBlock = <div className="timeline">{wedding.program.map((item, index) => <p key={index}><strong>{item.time}</strong><span>{item.title}</span></p>)}</div>;
-  const rsvpBlock = locked ? <div className="success-box"><Check size={22} />Raspunsul tau a fost salvat. Multumim! Nu mai poate fi modificat din acest link.</div> : (
+  const rsvpBlock = locked ? <div className="success-box"><Check size={22} />Răspunsul tău a fost salvat. Mulțumim! Nu mai poate fi modificat din acest link.</div> : (
     <form className="rsvp-form" onSubmit={async (event) => { event.preventDefault(); await api(`/api/invite/${token}`, { method: "POST", body: JSON.stringify(form) }); setSaved(true); }}>
-      <label>Raspuns<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}><option>Confirmat</option><option>Refuzat</option><option>In asteptare</option></select></label>
-      <label>Numar persoane<input type="number" min="1" max="10" value={form.seats} onChange={(event) => updateSeats(event.target.value)} /></label>
+      <label>Răspuns<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}><option>Confirmat</option><option>Refuzat</option><option>În așteptare</option></select></label>
+      <label>Număr persoane<input type="number" min="1" max="10" value={form.seats} onChange={(event) => updateSeats(event.target.value)} /></label>
       {mealChoiceFields}
-      <label>Alergii / restrictii<textarea value={form.allergies} onChange={(event) => setForm({ ...form, allergies: event.target.value })} /></label>
+      <label>Alergii / restricții<textarea value={form.allergies} onChange={(event) => setForm({ ...form, allergies: event.target.value })} /></label>
       <label>Mesaj pentru miri<textarea value={form.guest_message} onChange={(event) => setForm({ ...form, guest_message: event.target.value })} /></label>
-      <button type="submit">Trimite raspunsul</button>
+      <button type="submit">Trimite răspunsul</button>
     </form>
   );
 
-  return <TemplateOneInvitation data={data} details={details} form={form} heroStyle={heroStyle} locked={locked} mealChoiceFields={mealChoiceFields} menuOptions={menuOptions} primaryMediaUrl={primaryMediaUrl} programBlock={programBlock} rsvpBlock={rsvpBlock} setForm={setForm} token={token} updateSeats={updateSeats} />;
+  const templateProps = { data, details, form, heroStyle, locked, mealChoiceFields, menuOptions, primaryMediaUrl, programBlock, rsvpBlock, setForm, token, updateSeats };
+  if (wedding.invitation_template === "figma-landing") return <TemplateTwoFigmaLanding {...templateProps} />;
+  return <TemplateOneInvitation {...templateProps} />;
 }
 
 function TemplateOneInvitation({ data, details, form, heroStyle, locked, mealChoiceFields, primaryMediaUrl, programBlock, rsvpBlock, setForm, token, updateSeats }) {
   const wedding = data.wedding;
+  const design = template1Design(wedding);
   const primaryIsVideo = isVideoUrl(primaryMediaUrl);
   const secondaryMediaUrl = wedding.invite_secondary_image_url || wedding.hero_image_url || "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&w=1400&q=80";
   const secondaryIsVideo = isVideoUrl(secondaryMediaUrl);
-  const bottomStyle = secondaryIsVideo ? { background: "#1f2524" } : { backgroundImage: `linear-gradient(rgba(36,45,48,.58), rgba(36,45,48,.44)), url(${secondaryMediaUrl})` };
+  const bottomStyle = secondaryIsVideo ? { background: design.darkOverlay } : { backgroundImage: `linear-gradient(color-mix(in srgb, ${design.darkOverlay} 72%, transparent), color-mix(in srgb, ${design.darkOverlay} 58%, transparent)), url(${secondaryMediaUrl})` };
   const eventDate = weddingDateTime(wedding);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -1996,11 +2333,19 @@ function TemplateOneInvitation({ data, details, form, heroStyle, locked, mealCho
   const seconds = Math.floor((diff % 60000) / 1000);
   const mapUrl = wedding.map_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(wedding.venue || "")}`;
   return (
-    <main className="tpl1-page">
+    <main className="tpl1-page" style={{
+      "--tpl1-bg": design.background,
+      "--tpl1-text": design.text,
+      "--tpl1-muted": design.muted,
+      "--tpl1-accent": design.accent,
+      "--tpl1-card": design.card,
+      "--tpl1-border": design.border,
+      "--tpl1-overlay": design.darkOverlay
+    }}>
       <section className="tpl1-hero" style={heroStyle}>
         {primaryIsVideo ? <video className="tpl1-hero-media" src={primaryMediaUrl} autoPlay muted loop playsInline /> : null}
         <div className="tpl1-hero-content">
-          <p className="tpl1-topline">Save the date</p>
+          <p className="tpl1-topline">{design.heroKicker}</p>
           <h1>{wedding.couple}</h1>
           <p className="tpl1-meta">{dateLabel(wedding.wedding_date)}{wedding.wedding_time ? ` - ${wedding.wedding_time}` : ""}</p>
           <div className="tpl1-countdown">
@@ -2010,30 +2355,30 @@ function TemplateOneInvitation({ data, details, form, heroStyle, locked, mealCho
             <div><span>{String(seconds).padStart(2, "0")}</span><small>Sec</small></div>
           </div>
         </div>
-        <a className="tpl1-scroll" href="#details"><span />Scroll</a>
+        <a className="tpl1-scroll" href="#details"><span />{design.scrollText}</a>
       </section>
 
       <section className="tpl1-section" id="details">
-        <div className="tpl1-title"><span>Invitatie</span><h2>{wedding.venue || "Ziua noastra speciala"}</h2></div>
+        <div className="tpl1-title"><span>{design.detailsKicker}</span><h2>{wedding.venue || design.detailsTitle}</h2></div>
         <article className="tpl1-card tpl1-invite-card">
           <p className="eyebrow">Pentru {data.guest.name}</p>
           <p>{wedding.invite_intro}</p>
           {details}
-          <a className="tpl1-map" href={mapUrl} target="_blank" rel="noreferrer">Vezi locatia pe Google Maps</a>
+          <a className="tpl1-map" href={mapUrl} target="_blank" rel="noreferrer">{design.mapButton}</a>
         </article>
       </section>
 
       <div className="tpl1-divider"><img src={appLogo} alt="" /></div>
 
       <section className="tpl1-section tpl1-section-alt">
-        <div className="tpl1-title"><span>Dress code & tematica</span><h2>{wedding.dress_code || "Elegant"}</h2></div>
+        <div className="tpl1-title"><span>{design.dressKicker}</span><h2>{wedding.dress_code || design.dressTitle}</h2></div>
         <div className="tpl1-dress-grid">
           <article className="tpl1-card">
             <h3>Dress code</h3>
-            <p>{wedding.dress_code || "Tinuta eleganta, potrivita pentru seara."}</p>
+            <p>{wedding.dress_code || design.dressText}</p>
           </article>
           <article className="tpl1-card">
-            <h3>Programul zilei</h3>
+            <h3>{design.programTitle}</h3>
             {programBlock}
           </article>
         </div>
@@ -2043,23 +2388,255 @@ function TemplateOneInvitation({ data, details, form, heroStyle, locked, mealCho
         {secondaryIsVideo ? <video className="tpl1-rsvp-media" src={secondaryMediaUrl} autoPlay muted loop playsInline /> : null}
         <div className="tpl1-rsvp-overlay" />
         <div className="tpl1-rsvp-inner">
-          <div className="tpl1-title light"><span>Your response</span><h2>Confirma prezenta</h2></div>
+          <div className="tpl1-title light"><span>{design.rsvpKicker}</span><h2>{design.rsvpTitle}</h2></div>
           <article className="tpl1-rsvp-box">
             {locked ? rsvpBlock : (
               <form className="rsvp-form" onSubmit={async (event) => { event.preventDefault(); await api(`/api/invite/${token}`, { method: "POST", body: JSON.stringify(form) }); window.location.reload(); }}>
-                <label>Raspuns<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}><option>Confirmat</option><option>Refuzat</option></select></label>
-                <label>Numar persoane<input type="number" min="1" max="10" value={form.seats} onChange={(event) => updateSeats(event.target.value)} /></label>
+                <label>Răspuns<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}><option>Confirmat</option><option>Refuzat</option></select></label>
+                <label>Număr persoane<input type="number" min="1" max="10" value={form.seats} onChange={(event) => updateSeats(event.target.value)} /></label>
                 {mealChoiceFields}
-                <label>Alergii / restrictii<textarea value={form.allergies} onChange={(event) => setForm({ ...form, allergies: event.target.value })} /></label>
+                <label>Alergii / restricții<textarea value={form.allergies} onChange={(event) => setForm({ ...form, allergies: event.target.value })} /></label>
                 <label>Mesaj pentru miri<textarea value={form.guest_message} onChange={(event) => setForm({ ...form, guest_message: event.target.value })} /></label>
-                <button type="submit">Trimite raspunsul</button>
+                <button type="submit">Trimite răspunsul</button>
               </form>
             )}
           </article>
         </div>
       </section>
 
-      <footer className="tpl1-footer">Cu drag, {wedding.couple} {wedding.wedding_date ? `- ${dateLabel(wedding.wedding_date)}` : ""}</footer>
+      <footer className="tpl1-footer">{design.footerText}, {wedding.couple} {wedding.wedding_date ? `- ${dateLabel(wedding.wedding_date)}` : ""}</footer>
+    </main>
+  );
+}
+
+function TemplateFigmaLanding({ data, details, form, locked, mealChoiceFields, primaryMediaUrl, programBlock, rsvpBlock, setForm, token, updateSeats }) {
+  const wedding = data.wedding;
+  const primaryIsVideo = isVideoUrl(primaryMediaUrl);
+  const secondaryMediaUrl = wedding.invite_secondary_image_url || wedding.hero_image_url || "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?auto=format&fit=crop&w=1600&q=80";
+  const secondaryIsVideo = isVideoUrl(secondaryMediaUrl);
+  const mapUrl = wedding.map_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(wedding.venue || "")}`;
+  const heroStyle = primaryIsVideo ? {} : { backgroundImage: `linear-gradient(rgba(18, 20, 18, .32), rgba(18, 20, 18, .12)), url(${primaryMediaUrl})` };
+  return (
+    <main className="figma-wedding-page">
+      <section className="figma-landing-hero" style={heroStyle}>
+        {primaryIsVideo ? <video className="figma-template-media" src={primaryMediaUrl} autoPlay muted loop playsInline /> : null}
+        <nav><span>{wedding.couple}</span><a href="#rsvp">RSVP</a></nav>
+        <div className="figma-landing-copy">
+          <p>We're getting married</p>
+          <h1>{wedding.couple}</h1>
+          <span>{dateLabel(wedding.wedding_date)}{wedding.wedding_time ? ` · ${wedding.wedding_time}` : ""}</span>
+        </div>
+      </section>
+
+      <section className="figma-story-section">
+        <article>
+          <p className="figma-kicker">Invitație</p>
+          <h2>{wedding.venue || "Ziua noastră specială"}</h2>
+          <p>{wedding.invite_intro}</p>
+          {details}
+          <a href={mapUrl} target="_blank" rel="noreferrer">Vezi locația</a>
+        </article>
+        <figure>
+          {secondaryIsVideo ? <video src={secondaryMediaUrl} autoPlay muted loop playsInline /> : <img src={secondaryMediaUrl} alt="" />}
+        </figure>
+      </section>
+
+      <section className="figma-program-section">
+        <div>
+          <p className="figma-kicker">Program</p>
+          <h2>Momentele zilei</h2>
+        </div>
+        {programBlock}
+      </section>
+
+      <section className="figma-rsvp-section" id="rsvp">
+        <div>
+          <p className="figma-kicker">Confirmare</p>
+          <h2>Ne spui dacă ajungi?</h2>
+        </div>
+        <article>
+          {locked ? rsvpBlock : (
+            <form className="rsvp-form" onSubmit={async (event) => { event.preventDefault(); await api(`/api/invite/${token}`, { method: "POST", body: JSON.stringify(form) }); window.location.reload(); }}>
+              <label>Răspuns<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}><option>Confirmat</option><option>Refuzat</option></select></label>
+              <label>Număr persoane<input type="number" min="1" max="10" value={form.seats} onChange={(event) => updateSeats(event.target.value)} /></label>
+              {mealChoiceFields}
+              <label>Alergii / restricții<textarea value={form.allergies} onChange={(event) => setForm({ ...form, allergies: event.target.value })} /></label>
+              <label>Mesaj pentru miri<textarea value={form.guest_message} onChange={(event) => setForm({ ...form, guest_message: event.target.value })} /></label>
+              <button type="submit">Trimite răspunsul</button>
+            </form>
+          )}
+        </article>
+      </section>
+    </main>
+  );
+}
+
+function TemplateTwoFigmaLanding({ data, details, form, locked, mealChoiceFields, primaryMediaUrl, rsvpBlock, setForm, token, updateSeats }) {
+  const wedding = data.wedding;
+  const design = template2Design(wedding);
+  const primaryIsVideo = isVideoUrl(primaryMediaUrl);
+  const secondaryMediaUrl = wedding.invite_secondary_image_url || wedding.hero_image_url || "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?auto=format&fit=crop&w=1600&q=80";
+  const secondaryIsVideo = isVideoUrl(secondaryMediaUrl);
+  const mapUrl = wedding.map_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(wedding.venue || "")}`;
+  const heroStyle = primaryIsVideo ? {} : { backgroundImage: `linear-gradient(rgba(35, 39, 34, .16), rgba(35, 39, 34, .06)), url(${primaryMediaUrl})` };
+  const photoGrid = [
+    design.photoOne || "https://images.unsplash.com/photo-1516483638261-f4dbaf036963?auto=format&fit=crop&w=800&q=80",
+    design.photoTwo || "https://images.unsplash.com/photo-1523906834658-6e24ef2386f9?auto=format&fit=crop&w=800&q=80",
+    design.photoThree || "https://images.unsplash.com/photo-1533105079780-92b9be482077?auto=format&fit=crop&w=800&q=80",
+    design.photoFour || "https://images.unsplash.com/photo-1523531294919-4bcd7c65e216?auto=format&fit=crop&w=800&q=80",
+    design.photoFive || secondaryMediaUrl
+  ];
+  const gallery = [
+    primaryMediaUrl,
+    secondaryMediaUrl,
+    "https://images.unsplash.com/photo-1519225421980-715cb0215aed?auto=format&fit=crop&w=900&q=80",
+    "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&w=900&q=80",
+    "https://images.unsplash.com/photo-1523438885200-e635ba2c371e?auto=format&fit=crop&w=900&q=80",
+    "https://images.unsplash.com/photo-1529636798458-92182e662485?auto=format&fit=crop&w=900&q=80"
+  ];
+  const rsvpForm = locked ? rsvpBlock : (
+    <form className="rsvp-form" onSubmit={async (event) => { event.preventDefault(); await api(`/api/invite/${token}`, { method: "POST", body: JSON.stringify(form) }); window.location.reload(); }}>
+      <label>Răspuns<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}><option>Confirmat</option><option>Refuzat</option></select></label>
+      <label>Număr persoane<input type="number" min="1" max="10" value={form.seats} onChange={(event) => updateSeats(event.target.value)} /></label>
+      {mealChoiceFields}
+      <label>Alergii / restricții<textarea value={form.allergies} onChange={(event) => setForm({ ...form, allergies: event.target.value })} /></label>
+      <label>Mesaj pentru miri<textarea value={form.guest_message} onChange={(event) => setForm({ ...form, guest_message: event.target.value })} /></label>
+      <button type="submit">Trimite răspunsul</button>
+    </form>
+  );
+
+  return (
+    <main className="template2-page" style={{
+      "--t2-bg": design.background,
+      "--t2-text": design.text,
+      "--t2-muted": design.muted,
+      "--t2-accent": design.accent,
+      "--t2-band": design.darkBand,
+      "--t2-card": design.card,
+      "--t2-border": design.border
+    }}>
+      <section className="template2-hero" style={heroStyle}>
+        {primaryIsVideo ? <video className="template2-media" src={primaryMediaUrl} autoPlay muted loop playsInline /> : null}
+        <nav className="template2-nav">
+          <span className="template2-mark">{String(wedding.couple || "EA").slice(0, 2)}</span>
+          <div><a href="#photos">{design.photosTitle}</a><a href="#venue">{design.venueKicker}</a><a href="#gallery">{design.galleryTitle}</a><a href="#contact">{design.rsvpKicker}</a></div>
+          <small>♡ ◎ ↗</small>
+        </nav>
+        <div className="template2-hero-copy">
+          <p>{design.heroKicker}</p>
+          <h1>{design.heroTitle}</h1>
+          <span>{wedding.couple} · {dateLabel(wedding.wedding_date)}{wedding.wedding_time ? ` · ${wedding.wedding_time}` : ""}</span>
+        </div>
+        <div className="template2-wave" />
+      </section>
+
+      <section className="template2-photo-section" id="photos">
+        <p className="template2-kicker">{design.photosTitle}</p>
+        <div className="template2-photo-grid">
+          {photoGrid.map((image, index) => (
+            <figure key={`${image}-${index}`}><img src={image} alt="" /></figure>
+          ))}
+        </div>
+      </section>
+
+      <section className="template2-featured" id="venue">
+        <figure>{secondaryIsVideo ? <video src={secondaryMediaUrl} autoPlay muted loop playsInline /> : <img src={secondaryMediaUrl} alt="" />}</figure>
+        <article>
+          <p className="template2-kicker">{design.venueKicker}</p>
+          <h2>{wedding.venue || "Villa Balbiano"}</h2>
+          <p>{wedding.invite_intro}</p>
+          {details}
+          <a href={mapUrl} target="_blank" rel="noreferrer">Open location</a>
+        </article>
+      </section>
+
+      <section className="template2-services">
+        <p className="template2-kicker">{design.servicesTitle}</p>
+        <div>
+          {[design.serviceOne, design.serviceTwo, design.serviceThree].map((title, index) => (
+            <article key={title}><img src={gallery[index + 2]} alt="" /><h3>{title}</h3></article>
+          ))}
+        </div>
+      </section>
+
+      <section className="template2-gallery" id="gallery">
+        <p className="template2-kicker">{design.galleryTitle}</p>
+        <div>{gallery.map((image, index) => <img src={image} alt="" key={`${image}-${index}`} />)}</div>
+      </section>
+
+      <section className="template2-testimonial">
+        <p>{design.testimonialKicker}</p>
+        <blockquote>„{design.testimonialText}”</blockquote>
+        <span>{wedding.couple}</span>
+      </section>
+
+      <section className="template2-contact" id="contact">
+        <article>
+          <p className="template2-kicker">{design.rsvpKicker}</p>
+          <h2>{design.rsvpTitle}</h2>
+          {rsvpForm}
+        </article>
+        <aside>
+          <div className="template2-map">MAP</div>
+          <strong>{wedding.venue || "Wedding venue"}</strong>
+          <span>{wedding.venue_address || "Adresa se completează din setări"}</span>
+          <a href={mapUrl} target="_blank" rel="noreferrer">Deschide harta</a>
+        </aside>
+      </section>
+    </main>
+  );
+}
+
+function TemplateSimpleWedding({ data, details, form, locked, mealChoiceFields, primaryMediaUrl, programBlock, rsvpBlock, setForm, token, updateSeats }) {
+  const wedding = data.wedding;
+  const primaryIsVideo = isVideoUrl(primaryMediaUrl);
+  const mapUrl = wedding.map_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(wedding.venue || "")}`;
+  return (
+    <main className="simple-wedding-page">
+      <section className="simple-wedding-hero">
+        <div>
+          <p>Wedding invitation</p>
+          <h1>{wedding.couple}</h1>
+          <span>{dateLabel(wedding.wedding_date)}{wedding.wedding_time ? ` · ora ${wedding.wedding_time}` : ""}</span>
+          <a href="#simple-rsvp">Confirmă prezența</a>
+        </div>
+        <figure>
+          {primaryIsVideo ? <video src={primaryMediaUrl} autoPlay muted loop playsInline /> : <img src={primaryMediaUrl} alt="" />}
+        </figure>
+      </section>
+
+      <section className="simple-wedding-card">
+        <p className="figma-kicker">Pentru {data.guest.name}</p>
+        <h2>{wedding.venue || "Vă așteptăm cu drag"}</h2>
+        <p>{wedding.invite_intro}</p>
+        {details}
+        <a href={mapUrl} target="_blank" rel="noreferrer">Deschide locația</a>
+      </section>
+
+      <section className="simple-wedding-grid">
+        <article>
+          <h3>Program</h3>
+          {programBlock}
+        </article>
+        <article>
+          <h3>Dress code</h3>
+          <p>{wedding.dress_code || "Elegant, confortabil, potrivit pentru o seară de poveste."}</p>
+        </article>
+      </section>
+
+      <section className="simple-rsvp-card" id="simple-rsvp">
+        <h2>Confirmare RSVP</h2>
+        {locked ? rsvpBlock : (
+          <form className="rsvp-form" onSubmit={async (event) => { event.preventDefault(); await api(`/api/invite/${token}`, { method: "POST", body: JSON.stringify(form) }); window.location.reload(); }}>
+            <label>Răspuns<select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}><option>Confirmat</option><option>Refuzat</option></select></label>
+            <label>Număr persoane<input type="number" min="1" max="10" value={form.seats} onChange={(event) => updateSeats(event.target.value)} /></label>
+            {mealChoiceFields}
+            <label>Alergii / restricții<textarea value={form.allergies} onChange={(event) => setForm({ ...form, allergies: event.target.value })} /></label>
+            <label>Mesaj pentru miri<textarea value={form.guest_message} onChange={(event) => setForm({ ...form, guest_message: event.target.value })} /></label>
+            <button type="submit">Trimite răspunsul</button>
+          </form>
+        )}
+      </section>
     </main>
   );
 }
@@ -2099,10 +2676,10 @@ function MediaUploadPage({ token }) {
         <div className="media-upload-icon"><img src={appLogo} alt="" /></div>
         <p className="eyebrow">Albumul nuntii</p>
         <h1>{data.wedding.couple}</h1>
-        <p className="invite-copy">Incarca aici pozele si video-urile tale de la eveniment.</p>
-        {saved ? <div className="success-box"><Check size={22} />Fisierele au fost incarcate. Multumim!</div> : (
+        <p className="invite-copy">Încarcă aici pozele și video-urile tale de la eveniment.</p>
+        {saved ? <div className="success-box"><Check size={22} />Fișierele au fost încărcate. Mulțumim!</div> : (
           <form className="rsvp-form" onSubmit={submit}>
-            <label>Numele tau<input value={guestName} onChange={(event) => setGuestName(event.target.value)} /></label>
+            <label>Numele tău<input value={guestName} onChange={(event) => setGuestName(event.target.value)} /></label>
             <label className="file-field">Poze / video
               <span className="file-picker upload-picker">
                 <input multiple accept="image/*,video/*" type="file" onChange={(event) => setFiles(event.target.files)} />
@@ -2110,7 +2687,7 @@ function MediaUploadPage({ token }) {
               </span>
             </label>
             {error ? <p className="form-error">{error}</p> : null}
-            <button type="submit"><ImageUp size={18} />Incarca fisiere</button>
+            <button type="submit"><ImageUp size={18} />Încarcă fișiere</button>
           </form>
         )}
       </section>
@@ -2122,3 +2699,4 @@ const rootElement = document.getElementById("root");
 const root = window.__gestionareNuntaRoot || createRoot(rootElement);
 window.__gestionareNuntaRoot = root;
 root.render(<App />);
+

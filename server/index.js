@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { copyFile, readFile, writeFile } from "node:fs/promises";
 import { createReadStream, existsSync, mkdirSync } from "node:fs";
-import { basename, extname, join, resolve } from "node:path";
+import { basename, extname, isAbsolute, join, relative, resolve } from "node:path";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { createRequire } from "node:module";
 import { DatabaseSync } from "node:sqlite";
@@ -12,16 +12,18 @@ const AdmZip = require("adm-zip");
 const PDFDocument = require("pdfkit");
 
 const rootDir = resolve(process.cwd());
-const dataDir = join(rootDir, "data");
+const dataDir = resolve(process.env.DATA_DIR || join(rootDir, "data"));
 const uploadsDir = join(dataDir, "uploads");
 const dbPath = join(dataDir, "wedding.sqlite");
 const port = Number(process.env.PORT || 4000);
+const isProduction = process.env.NODE_ENV === "production";
 const sessionTtlMs = 1000 * 60 * 60 * 24 * 7;
 const sessionIdleMs = 1000 * 60 * 60 * 2;
 const loginWindowMs = 1000 * 60 * 10;
 const loginMaxFailures = 5;
 const apiWindowMs = 1000 * 60;
 const apiMaxRequests = 240;
+const maxPublicUploadFileBytes = 25_000_000;
 const loginFailures = new Map();
 const apiHits = new Map();
 
@@ -114,6 +116,7 @@ function migrate() {
       onboarding_completed INTEGER NOT NULL DEFAULT 0,
       theme_color TEXT NOT NULL DEFAULT 'sage',
       invitation_template TEXT NOT NULL DEFAULT 'custom',
+      invitation_design_json TEXT NOT NULL DEFAULT '{}',
       brand_name TEXT NOT NULL DEFAULT 'Gestionare Nunta',
       brand_logo_url TEXT,
       invite_intro TEXT,
@@ -275,6 +278,11 @@ function migrate() {
   addColumn("users", "last_login_at", "TEXT");
   addColumn("media_uploads", "seen_at", "TEXT");
   addColumn("guests", "confirmed_at", "TEXT");
+  addColumn("guests", "deleted_at", "TEXT");
+  addColumn("suppliers", "deleted_at", "TEXT");
+  addColumn("budget_items", "deleted_at", "TEXT");
+  addColumn("tasks", "deleted_at", "TEXT");
+  addColumn("seating_tables", "deleted_at", "TEXT");
   addColumn("activity_events", "seen_at", "TEXT");
   addColumn("weddings", "wedding_time", "TEXT");
   addColumn("weddings", "profile_image_url", "TEXT");
@@ -282,6 +290,7 @@ function migrate() {
   addColumn("weddings", "invite_secondary_image_url", "TEXT");
   addColumn("weddings", "theme_color", "TEXT NOT NULL DEFAULT 'sage'");
   addColumn("weddings", "invitation_template", "TEXT NOT NULL DEFAULT 'custom'");
+  addColumn("weddings", "invitation_design_json", "TEXT NOT NULL DEFAULT '{}'");
   addColumn("weddings", "brand_name", "TEXT NOT NULL DEFAULT 'Gestionare Nunta'");
   addColumn("weddings", "brand_logo_url", "TEXT");
   addColumn("weddings", "menu_options_json", "TEXT NOT NULL DEFAULT '[\"Carne\",\"Peste\",\"Vegetarian\",\"Copil\"]'");
@@ -322,86 +331,22 @@ function addActivity(weddingId, type, title, detail = "") {
 }
 
 function seed() {
-  let user = db.prepare("SELECT * FROM users ORDER BY created_at LIMIT 1").get();
-  if (!user) {
-    const { hash, salt } = hashPassword("admin123");
-    const userId = id("usr");
-    db.prepare("INSERT INTO users (id, name, email, password_hash, salt) VALUES (?, ?, ?, ?, ?)")
-      .run(userId, "Ana si Mihai", "admin@nunta.local", hash, salt);
-    user = db.prepare("SELECT * FROM users WHERE id = ?").get(userId);
+  const email = String(process.env.SUPER_ADMIN_EMAIL || (isProduction ? "" : "superadmin@platform.local")).trim().toLowerCase();
+  const password = String(process.env.SUPER_ADMIN_PASSWORD || (isProduction ? "" : "SuperAdmin123!"));
+  const name = String(process.env.SUPER_ADMIN_NAME || "Super Admin");
+  if (!email || !password) return;
+  if (passwordPolicyError(password)) {
+    console.warn("SUPER_ADMIN_PASSWORD nu respecta politica parolei. Super adminul nu a fost creat.");
+    return;
   }
-
-  if (!db.prepare("SELECT id FROM users WHERE email = ?").get("superadmin@platform.local")) {
-    const { hash, salt } = hashPassword("superadmin123");
-    db.prepare("INSERT INTO users (id, name, email, password_hash, salt, is_super_admin) VALUES (?, ?, ?, ?, ?, 1)")
-      .run(id("usr"), "Super Admin", "superadmin@platform.local", hash, salt);
+  const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(email);
+  if (existing) {
+    db.prepare("UPDATE users SET is_super_admin = 1, status = 'active' WHERE id = ?").run(existing.id);
+    return;
   }
-
-  let wedding = db.prepare("SELECT * FROM weddings ORDER BY created_at LIMIT 1").get();
-  if (!wedding) {
-    const weddingId = id("wed");
-    db.prepare(`
-      INSERT INTO weddings (
-        id, owner_id, couple, wedding_date, venue, venue_address, map_url, dress_code,
-        hero_image_url, invite_intro, program_json, whatsapp_message, media_token
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      weddingId,
-      user.id,
-      "Ana & Mihai",
-      "",
-      "Restaurant",
-      "",
-      "",
-      "Elegant",
-      "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=1800&q=80",
-      "Va asteptam cu drag sa sarbatorim impreuna.",
-      JSON.stringify([
-        { time: "15:00", title: "Cununie civila" },
-        { time: "17:00", title: "Ceremonie" },
-        { time: "19:00", title: "Petrecere" }
-      ]),
-      "Buna, {name}! Te invitam cu drag la nunta noastra. Confirma aici: {link}",
-      token()
-    );
-    db.prepare("INSERT OR IGNORE INTO wedding_users (wedding_id, user_id, role) VALUES (?, ?, 'owner')").run(weddingId, user.id);
-    wedding = db.prepare("SELECT * FROM weddings WHERE id = ?").get(weddingId);
-  }
-
-  db.prepare("INSERT OR IGNORE INTO wedding_users (wedding_id, user_id, role) VALUES (?, ?, 'owner')").run(wedding.id, user.id);
-  db.prepare("UPDATE guests SET wedding_id = ? WHERE wedding_id IS NULL").run(wedding.id);
-  db.prepare("UPDATE budget_items SET wedding_id = ? WHERE wedding_id IS NULL").run(wedding.id);
-  db.prepare("UPDATE tasks SET wedding_id = ? WHERE wedding_id IS NULL").run(wedding.id);
-
-  const guests = db.prepare("SELECT COUNT(*) AS total FROM guests WHERE wedding_id = ?").get(wedding.id).total;
-  if (!guests) {
-    const insert = db.prepare(`
-      INSERT INTO guests (id, wedding_id, name, phone, side, group_name, status, meal_choice, allergies, seats, invitation_token, table_name)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    insert.run(id("gst"), wedding.id, "Maria Popescu", "40740123456", "Mireasa", "Familie", "Confirmat", "Vegetarian", "", 1, token(), "Masa 1");
-    insert.run(id("gst"), wedding.id, "Andrei Ionescu", "40722987654", "Mire", "Prieteni", "In asteptare", "", "", 2, token(), "");
-  }
-
-  const tables = db.prepare("SELECT COUNT(*) AS total FROM seating_tables WHERE wedding_id = ?").get(wedding.id).total;
-  if (!tables) {
-    db.prepare("INSERT INTO seating_tables (id, wedding_id, name, capacity) VALUES (?, ?, ?, ?)").run(id("tbl"), wedding.id, "Masa 1", 8);
-    db.prepare("INSERT INTO seating_tables (id, wedding_id, name, capacity) VALUES (?, ?, ?, ?)").run(id("tbl"), wedding.id, "Masa 2", 10);
-  }
-
-  const budget = db.prepare("SELECT COUNT(*) AS total FROM budget_items WHERE wedding_id = ?").get(wedding.id).total;
-  if (!budget) {
-    const insert = db.prepare("INSERT INTO budget_items (id, wedding_id, item, supplier, planned, paid, status, due) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-    insert.run(id("bdg"), wedding.id, "Restaurant", "Restaurant", 42000, 10000, "Avans", "");
-    insert.run(id("bdg"), wedding.id, "Foto video", "Studio foto", 6500, 6500, "Achitat", "");
-  }
-
-  const tasks = db.prepare("SELECT COUNT(*) AS total FROM tasks WHERE wedding_id = ?").get(wedding.id).total;
-  if (!tasks) {
-    const insert = db.prepare("INSERT INTO tasks (id, wedding_id, title, due, owner, stage, priority, done) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-    insert.run(id("tsk"), wedding.id, "Confirma meniul final", "", "Amandoi", "Restaurant", "Mare", 0);
-    insert.run(id("tsk"), wedding.id, "Trimite invitatiile pe WhatsApp", "", "Mireasa", "Invitatii", "Medie", 0);
-  }
+  const { hash, salt } = hashPassword(password);
+  db.prepare("INSERT INTO users (id, name, email, password_hash, salt, is_super_admin) VALUES (?, ?, ?, ?, ?, 1)")
+    .run(id("usr"), name, email, hash, salt);
 }
 
 migrate();
@@ -444,6 +389,11 @@ function sendFile(res, filePath, mimeType = "application/octet-stream", download
   if (downloadName) headers["Content-Disposition"] = `attachment; filename="${downloadName}"`;
   res.writeHead(200, securityHeaders(headers));
   createReadStream(filePath).pipe(res);
+}
+
+function isInsideDirectory(parentDir, filePath) {
+  const rel = relative(parentDir, filePath);
+  return rel === "" || (rel && !rel.startsWith("..") && !isAbsolute(rel));
 }
 
 function readBody(req, maxBytes = 30_000_000) {
@@ -632,10 +582,17 @@ function weddingsForUser(userId) {
 }
 
 function parseWedding(row) {
+  let invitationDesign = {};
+  try {
+    invitationDesign = JSON.parse(row.invitation_design_json || "{}");
+  } catch {
+    invitationDesign = {};
+  }
   return {
     ...row,
     program: JSON.parse(row.program_json || "[]"),
-    menu_options: JSON.parse(row.menu_options_json || '["Carne","Peste","Vegetarian","Copil"]')
+    menu_options: JSON.parse(row.menu_options_json || '["Carne","Peste","Vegetarian","Copil"]'),
+    invitation_design: invitationDesign
   };
 }
 
@@ -703,7 +660,7 @@ function listGuests(wedding, origin) {
   return db.prepare(`
     SELECT guests.*, seating_tables.name AS table_label
     FROM guests LEFT JOIN seating_tables ON seating_tables.id = guests.table_id
-    WHERE guests.wedding_id = ?
+    WHERE guests.wedding_id = ? AND guests.deleted_at IS NULL
     ORDER BY
       CASE WHEN guests.status = 'Confirmat' THEN 0 ELSE 1 END,
       CASE WHEN guests.status = 'Confirmat' THEN COALESCE(guests.confirmed_at, guests.updated_at) ELSE guests.created_at END DESC,
@@ -717,10 +674,10 @@ function dashboard(wedding, origin, userId = wedding.owner_id) {
     wedding: { ...wedding, role },
     weddings: weddingsForUser(userId),
     guests: listGuests(wedding, origin),
-    tables: db.prepare("SELECT * FROM seating_tables WHERE wedding_id = ? ORDER BY created_at DESC").all(wedding.id),
-    budget: db.prepare("SELECT * FROM budget_items WHERE wedding_id = ? ORDER BY created_at DESC").all(wedding.id),
-    suppliers: db.prepare("SELECT id, name, category, phone, email, contract_name, advance, total, due, notes, created_at FROM suppliers WHERE wedding_id = ? ORDER BY created_at DESC").all(wedding.id),
-    tasks: db.prepare("SELECT * FROM tasks WHERE wedding_id = ? ORDER BY done ASC, due ASC, created_at DESC").all(wedding.id)
+    tables: db.prepare("SELECT * FROM seating_tables WHERE wedding_id = ? AND deleted_at IS NULL ORDER BY created_at DESC").all(wedding.id),
+    budget: db.prepare("SELECT * FROM budget_items WHERE wedding_id = ? AND deleted_at IS NULL ORDER BY created_at DESC").all(wedding.id),
+    suppliers: db.prepare("SELECT id, name, category, phone, email, contract_name, advance, total, due, notes, created_at FROM suppliers WHERE wedding_id = ? AND deleted_at IS NULL ORDER BY created_at DESC").all(wedding.id),
+    tasks: db.prepare("SELECT * FROM tasks WHERE wedding_id = ? AND deleted_at IS NULL ORDER BY done ASC, due ASC, created_at DESC").all(wedding.id)
       .map((task) => ({ ...task, done: Boolean(task.done) })),
     roomTables: db.prepare("SELECT * FROM room_tables WHERE wedding_id = ?").all(wedding.id),
     team: db.prepare(`
@@ -735,8 +692,8 @@ function dashboard(wedding, origin, userId = wedding.owner_id) {
     notifications: {
       newAcceptances: db.prepare("SELECT COUNT(*) AS total FROM activity_events WHERE wedding_id = ? AND type = 'rsvp_confirmed' AND seen_at IS NULL").get(wedding.id).total,
       newUploads: db.prepare("SELECT COUNT(*) AS total FROM media_uploads WHERE wedding_id = ? AND seen_at IS NULL").get(wedding.id).total,
-      openTasks: db.prepare("SELECT COUNT(*) AS total FROM tasks WHERE wedding_id = ? AND done = 0 AND due IS NOT NULL AND due != '' AND date(due) <= date('now', '+7 day')").get(wedding.id).total,
-      duePayments: db.prepare("SELECT COUNT(*) AS total FROM budget_items WHERE wedding_id = ? AND status != 'Achitat' AND due IS NOT NULL AND due != '' AND date(due) <= date('now', '+14 day')").get(wedding.id).total
+      openTasks: db.prepare("SELECT COUNT(*) AS total FROM tasks WHERE wedding_id = ? AND deleted_at IS NULL AND done = 0 AND due IS NOT NULL AND due != '' AND date(due) <= date('now', '+7 day')").get(wedding.id).total,
+      duePayments: db.prepare("SELECT COUNT(*) AS total FROM budget_items WHERE wedding_id = ? AND deleted_at IS NULL AND status != 'Achitat' AND due IS NOT NULL AND due != '' AND date(due) <= date('now', '+14 day')").get(wedding.id).total
     },
     recentAcceptances: db.prepare("SELECT id, title, detail, seen_at, created_at FROM activity_events WHERE wedding_id = ? AND type = 'rsvp_confirmed' ORDER BY created_at DESC LIMIT 5").all(wedding.id)
   };
@@ -749,12 +706,12 @@ function adminDashboard(origin) {
     ORDER BY weddings.created_at DESC
   `).all();
   const rows = weddings.map((wedding) => {
-    const guests = db.prepare("SELECT COUNT(*) AS total FROM guests WHERE wedding_id = ?").get(wedding.id).total;
-    const confirmed = db.prepare("SELECT COALESCE(SUM(seats), 0) AS total FROM guests WHERE wedding_id = ? AND status = 'Confirmat'").get(wedding.id).total;
+    const guests = db.prepare("SELECT COUNT(*) AS total FROM guests WHERE wedding_id = ? AND deleted_at IS NULL").get(wedding.id).total;
+    const confirmed = db.prepare("SELECT COALESCE(SUM(seats), 0) AS total FROM guests WHERE wedding_id = ? AND deleted_at IS NULL AND status = 'Confirmat'").get(wedding.id).total;
     const uploads = db.prepare("SELECT COUNT(*) AS total FROM media_uploads WHERE wedding_id = ?").get(wedding.id).total;
     const newUploads = db.prepare("SELECT COUNT(*) AS total FROM media_uploads WHERE wedding_id = ? AND seen_at IS NULL").get(wedding.id).total;
-    const planned = db.prepare("SELECT COALESCE(SUM(planned), 0) AS total FROM budget_items WHERE wedding_id = ?").get(wedding.id).total;
-    const paid = db.prepare("SELECT COALESCE(SUM(paid), 0) AS total FROM budget_items WHERE wedding_id = ?").get(wedding.id).total;
+    const planned = db.prepare("SELECT COALESCE(SUM(planned), 0) AS total FROM budget_items WHERE wedding_id = ? AND deleted_at IS NULL").get(wedding.id).total;
+    const paid = db.prepare("SELECT COALESCE(SUM(paid), 0) AS total FROM budget_items WHERE wedding_id = ? AND deleted_at IS NULL").get(wedding.id).total;
     return { ...wedding, guests, confirmed, uploads, newUploads, planned, paid, status: wedding.status || "active", publicInviteBase: `${origin}/invite/` };
   });
   return {
@@ -772,7 +729,9 @@ function adminDashboard(origin) {
 }
 
 function csvEscape(value) {
-  return `"${String(value ?? "").replaceAll('"', '""')}"`;
+  let text = String(value ?? "");
+  if (/^[=+\-@\t\r\n]/.test(text)) text = `'${text}`;
+  return `"${text.replaceAll('"', '""')}"`;
 }
 
 function toCsv(rows, columns) {
@@ -907,7 +866,7 @@ async function handleApi(req, res, url) {
 
   if (req.method === "GET" && url.pathname.startsWith("/api/invite/")) {
     const inviteToken = url.pathname.split("/").pop();
-    const guest = db.prepare("SELECT * FROM guests WHERE invitation_token = ?").get(inviteToken);
+    const guest = db.prepare("SELECT * FROM guests WHERE invitation_token = ? AND deleted_at IS NULL").get(inviteToken);
     if (!guest) return send(res, 404, { message: "Invitatia nu a fost gasita." });
     send(res, 200, { wedding: parseWedding(db.prepare("SELECT * FROM weddings WHERE id = ?").get(guest.wedding_id)), guest: { ...guest, meal_choices: JSON.parse(guest.meal_choices_json || "[]") } });
     return;
@@ -916,7 +875,7 @@ async function handleApi(req, res, url) {
   if (req.method === "POST" && url.pathname.startsWith("/api/invite/")) {
     const inviteToken = url.pathname.split("/").pop();
     const body = await readBody(req);
-    const guest = db.prepare("SELECT * FROM guests WHERE invitation_token = ?").get(inviteToken);
+    const guest = db.prepare("SELECT * FROM guests WHERE invitation_token = ? AND deleted_at IS NULL").get(inviteToken);
     if (!guest) return send(res, 404, { message: "Invitatia nu a fost gasita." });
     if (guest.status !== "In asteptare") return send(res, 409, { message: "Raspunsul a fost deja trimis si nu mai poate fi modificat." });
     const status = ["Confirmat", "Refuzat"].includes(body.status) ? body.status : "Confirmat";
@@ -957,6 +916,7 @@ async function handleApi(req, res, url) {
     for (const file of files) {
       const upload = safeDataUpload(file.dataUrl, ["image/", "video/"]);
       if (!upload) continue;
+      if (upload.buffer.length > maxPublicUploadFileBytes) continue;
       const cleanName = basename(String(file.name || "fisier").replace(/[^\w.\- ]/g, "_")).replace(/\.(exe|js|html?|bat|cmd|ps1)$/i, "");
       const fileName = `${id("media")}_${cleanName}${mediaExtension(upload.mimeType)}`;
       const filePath = join(targetDir, fileName);
@@ -974,7 +934,8 @@ async function handleApi(req, res, url) {
     const [, , , weddingId, maybeFolder, ...rest] = url.pathname.split("/");
     const folder = rest.length ? maybeFolder : "hero";
     const fileName = basename((rest.length ? rest : [maybeFolder]).join("/"));
-    const filePath = join(uploadsDir, weddingId, folder, fileName);
+    const filePath = resolve(uploadsDir, weddingId, folder, fileName);
+    if (!isInsideDirectory(resolve(uploadsDir), filePath)) return send(res, 400, { message: "Cale fisier invalida." });
     if (!existsSync(filePath)) return send(res, 404, { message: "Fisierul nu exista." });
     sendFile(res, filePath, mimeTypes[extname(filePath)] || "application/octet-stream");
     return;
@@ -1089,6 +1050,34 @@ async function handleApi(req, res, url) {
     return;
   }
 
+  if (req.method === "POST" && url.pathname === "/api/invitation-design-upload") {
+    if (!requireRole(res, wedding, "owner")) return;
+    const body = await readBody(req, 30_000_000);
+    const allowedKeys = new Set(["photoOne", "photoTwo", "photoThree", "photoFour", "photoFive"]);
+    const key = String(body.key || "");
+    if (!allowedKeys.has(key)) return send(res, 422, { message: "Slot imagine invalid." });
+    const upload = safeDataUpload(body.dataUrl, ["image/"]);
+    if (!upload) return send(res, 422, { message: "Incarca o imagine valida." });
+    const ext = mediaExtension(upload.mimeType);
+    const targetDir = join(uploadsDir, wedding.id, "template");
+    if (!existsSync(targetDir)) mkdirSync(targetDir, { recursive: true });
+    const fileName = `${key}_${Date.now()}${ext}`;
+    const filePath = join(targetDir, fileName);
+    await writeFile(filePath, upload.buffer);
+    const mediaUrl = `/api/public-media/${wedding.id}/template/${fileName}`;
+    let design = {};
+    try {
+      design = JSON.parse(wedding.invitation_design_json || "{}");
+    } catch {
+      design = {};
+    }
+    design[key] = mediaUrl;
+    db.prepare("UPDATE weddings SET invitation_design_json = ? WHERE id = ?").run(JSON.stringify(design), wedding.id);
+    addAudit(wedding.id, session.user_id, wedding.role, "upload_invitation_design_media", key, mediaUrl);
+    send(res, 200, { url: mediaUrl, wedding: parseWedding(db.prepare("SELECT * FROM weddings WHERE id = ?").get(wedding.id)) });
+    return;
+  }
+
   if (req.method === "POST" && url.pathname === "/api/profile-upload") {
     if (!requireRole(res, wedding, "owner")) return;
     const body = await readBody(req, 20_000_000);
@@ -1147,7 +1136,7 @@ async function handleApi(req, res, url) {
     const body = await readBody(req);
     db.prepare(`
       UPDATE weddings SET couple = ?, wedding_date = ?, wedding_time = ?, venue = ?, venue_address = ?, map_url = ?, dress_code = ?,
-      hero_image_url = ?, invite_secondary_image_url = ?, profile_image_url = ?, theme_color = ?, invitation_template = ?, invite_intro = ?, menu_options_json = ?, program_json = ?, whatsapp_message = ? WHERE id = ?
+      hero_image_url = ?, invite_secondary_image_url = ?, profile_image_url = ?, theme_color = ?, invitation_template = ?, invitation_design_json = ?, invite_intro = ?, menu_options_json = ?, program_json = ?, whatsapp_message = ? WHERE id = ?
     `).run(
       String(body.couple || "Nunta"),
       String(body.wedding_date || ""),
@@ -1161,6 +1150,7 @@ async function handleApi(req, res, url) {
       String(body.profile_image_url || ""),
       ["sage", "rose", "navy", "dark"].includes(body.theme_color) ? body.theme_color : "sage",
       String(body.invitation_template || "custom"),
+      JSON.stringify(body.invitation_design && typeof body.invitation_design === "object" ? body.invitation_design : {}),
       String(body.invite_intro || ""),
       JSON.stringify((Array.isArray(body.menu_options) ? body.menu_options : []).filter(Boolean)),
       JSON.stringify(Array.isArray(body.program) ? body.program : []),
@@ -1253,7 +1243,7 @@ async function handleApi(req, res, url) {
   if (req.method === "PATCH" && url.pathname.startsWith("/api/suppliers/")) {
     if (!requireRole(res, wedding, "planner")) return;
     const supplierId = url.pathname.split("/").pop();
-    const current = db.prepare("SELECT * FROM suppliers WHERE id = ? AND wedding_id = ?").get(supplierId, wedding.id);
+    const current = db.prepare("SELECT * FROM suppliers WHERE id = ? AND wedding_id = ? AND deleted_at IS NULL").get(supplierId, wedding.id);
     if (!current) return send(res, 404, { message: "Furnizorul nu exista." });
     const body = await readBody(req, 20_000_000);
     let contractName = current.contract_name || "";
@@ -1293,8 +1283,8 @@ async function handleApi(req, res, url) {
   if (req.method === "DELETE" && url.pathname.startsWith("/api/suppliers/")) {
     if (!requireRole(res, wedding, "planner")) return;
     const supplierId = url.pathname.split("/").pop();
-    const supplier = db.prepare("SELECT name FROM suppliers WHERE id = ? AND wedding_id = ?").get(supplierId, wedding.id);
-    db.prepare("DELETE FROM suppliers WHERE id = ? AND wedding_id = ?").run(supplierId, wedding.id);
+    const supplier = db.prepare("SELECT name FROM suppliers WHERE id = ? AND wedding_id = ? AND deleted_at IS NULL").get(supplierId, wedding.id);
+    db.prepare("UPDATE suppliers SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND wedding_id = ?").run(supplierId, wedding.id);
     if (supplier) addActivity(wedding.id, "supplier", `Furnizor sters: ${supplier.name}`, "");
     addAudit(wedding.id, session.user_id, wedding.role, "delete_supplier", supplierId, supplier?.name || "");
     send(res, 200, dashboard(wedding, origin, session.user_id));
@@ -1327,7 +1317,7 @@ async function handleApi(req, res, url) {
     if (!requireRole(res, wedding, "planner")) return;
     const body = await readBody(req);
     const guestId = url.pathname.split("/").pop();
-    const current = db.prepare("SELECT * FROM guests WHERE id = ? AND wedding_id = ?").get(guestId, wedding.id);
+    const current = db.prepare("SELECT * FROM guests WHERE id = ? AND wedding_id = ? AND deleted_at IS NULL").get(guestId, wedding.id);
     if (!current) return send(res, 404, { message: "Invitatul nu exista." });
     const nextStatus = body.status === undefined ? current.status : String(body.status || "In asteptare");
     const nextConfirmedAt = body.status === undefined
@@ -1359,7 +1349,7 @@ async function handleApi(req, res, url) {
 
   if (req.method === "DELETE" && url.pathname.startsWith("/api/guests/")) {
     if (!requireRole(res, wedding, "planner")) return;
-    db.prepare("DELETE FROM guests WHERE id = ? AND wedding_id = ?").run(url.pathname.split("/").pop(), wedding.id);
+    db.prepare("UPDATE guests SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND wedding_id = ?").run(url.pathname.split("/").pop(), wedding.id);
     addAudit(wedding.id, session.user_id, wedding.role, "delete_guest", url.pathname.split("/").pop(), "");
     send(res, 200, dashboard(wedding, origin, session.user_id));
     return;
@@ -1377,8 +1367,8 @@ async function handleApi(req, res, url) {
   if (req.method === "DELETE" && url.pathname.startsWith("/api/tables/")) {
     if (!requireRole(res, wedding, "planner")) return;
     const tableId = url.pathname.split("/").pop();
-    db.prepare("UPDATE guests SET table_id = '' WHERE table_id = ? AND wedding_id = ?").run(tableId, wedding.id);
-    db.prepare("DELETE FROM seating_tables WHERE id = ? AND wedding_id = ?").run(tableId, wedding.id);
+    db.prepare("UPDATE guests SET table_id = '' WHERE table_id = ? AND wedding_id = ? AND deleted_at IS NULL").run(tableId, wedding.id);
+    db.prepare("UPDATE seating_tables SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND wedding_id = ?").run(tableId, wedding.id);
     send(res, 200, dashboard(wedding, origin, session.user_id));
     return;
   }
@@ -1394,7 +1384,7 @@ async function handleApi(req, res, url) {
 
   if (req.method === "DELETE" && url.pathname.startsWith("/api/budget/")) {
     if (!requireRole(res, wedding, "planner")) return;
-    db.prepare("DELETE FROM budget_items WHERE id = ? AND wedding_id = ?").run(url.pathname.split("/").pop(), wedding.id);
+    db.prepare("UPDATE budget_items SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND wedding_id = ?").run(url.pathname.split("/").pop(), wedding.id);
     send(res, 200, dashboard(wedding, origin, session.user_id));
     return;
   }
@@ -1418,7 +1408,7 @@ async function handleApi(req, res, url) {
 
   if (req.method === "DELETE" && url.pathname.startsWith("/api/tasks/")) {
     if (!requireRole(res, wedding, "planner")) return;
-    db.prepare("DELETE FROM tasks WHERE id = ? AND wedding_id = ?").run(url.pathname.split("/").pop(), wedding.id);
+    db.prepare("UPDATE tasks SET deleted_at = CURRENT_TIMESTAMP WHERE id = ? AND wedding_id = ?").run(url.pathname.split("/").pop(), wedding.id);
     send(res, 200, dashboard(wedding, origin, session.user_id));
     return;
   }
@@ -1588,7 +1578,7 @@ async function handleApi(req, res, url) {
       return;
     }
     if (type === "budget") {
-      const rows = db.prepare("SELECT name, phone, email, contract_name, advance, total, notes, created_at FROM suppliers WHERE wedding_id = ? ORDER BY created_at DESC").all(wedding.id)
+      const rows = db.prepare("SELECT name, phone, email, contract_name, advance, total, notes, created_at FROM suppliers WHERE wedding_id = ? AND deleted_at IS NULL ORDER BY created_at DESC").all(wedding.id)
         .map((supplier) => ({
           ...supplier,
           contact: [supplier.phone, supplier.email].filter(Boolean).join(" / "),
@@ -1642,6 +1632,11 @@ async function serveStatic(req, res, url) {
 
   const relativePath = pathname.replace(/^\/+/, "");
   const filePath = resolve(distDir, relativePath);
+  if (!isInsideDirectory(distDir, filePath)) {
+    res.writeHead(400, securityHeaders({ "Content-Type": "text/plain; charset=utf-8" }));
+    res.end("Invalid path");
+    return;
+  }
 
   try {
     const file = await readFile(filePath);
