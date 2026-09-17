@@ -152,11 +152,12 @@ async function route(req: Request): Promise<Response> {
       .replace(/^\/api\/?/, '')
       .split('/')
       .filter(Boolean),
-    method = req.method;
+    method = req.method,
+    publicOrigin = bindings().APP_ORIGIN?.replace(/\/$/, '') || url.origin;
   const write = !['GET', 'HEAD'].includes(method);
   if (write && !['webhooks', 'jobs'].includes(parts[0])) {
     const origin = req.headers.get('origin');
-    if (origin && origin !== url.origin)
+    if (origin && origin !== url.origin && origin !== publicOrigin)
       throw new AppError(403, 'Originea cererii nu este autorizată.');
     if (req.headers.get('sec-fetch-site') === 'cross-site')
       throw new AppError(403, 'Cerere între site-uri respinsă.');
@@ -173,7 +174,7 @@ async function route(req: Request): Promise<Response> {
       !secureEqual(req.headers.get('authorization') || '', 'Bearer ' + secret)
     )
       throw new AppError(401, 'Autorizare necesară.');
-    return json(await tick(url.origin));
+    return json(await tick(publicOrigin));
   }
   let body: Data = {};
   if (
@@ -217,7 +218,7 @@ async function route(req: Request): Promise<Response> {
     parts.length === 2 &&
     method === 'POST'
   )
-    return json(await bootstrapAdmin(req, body, url.origin), 201);
+    return json(await bootstrapAdmin(req, body, publicOrigin), 201);
   if (parts[0] === 'public') return publicRoute(req, parts[1], body);
   if (parts[0] === 'me') {
     const u = await user(req);
@@ -652,7 +653,7 @@ async function route(req: Request): Promise<Response> {
           { ...data, date: data.date, time: data.time },
           a,
           es,
-          url.origin,
+          publicOrigin,
           u.id,
         )),
       );
@@ -802,7 +803,7 @@ async function route(req: Request): Promise<Response> {
       statements,
       family.id,
     );
-    return json({ ...result, url: `${url.origin}/rsvp/${raw}` });
+    return json({ ...result, url: `${publicOrigin}/rsvp/${raw}` });
   }
   if (op === 'revoke-links' && method === 'POST') {
     authorize(a, 'invitation', 'delete');
@@ -848,7 +849,7 @@ async function route(req: Request): Promise<Response> {
     if (body.activate !== true)
       throw new AppError(400, 'Confirmă explicit programarea campaniei.');
     const id = uid(),
-      s = await campaignStatements(eventId, id, body, a, es, url.origin, u.id);
+      s = await campaignStatements(eventId, id, body, a, es, publicOrigin, u.id);
     s.unshift(
       ...insertEntity(
         eventId,
@@ -897,7 +898,7 @@ async function route(req: Request): Promise<Response> {
     authorize(a, 'campaign', 'send');
     if (!event.data.demo)
       throw new AppError(403, 'Acțiune disponibilă doar în demo.');
-    return json(await tick(url.origin, eventId, true));
+    return json(await tick(publicOrigin, eventId, true));
   }
   if (op === 'checkin' && method === 'POST') {
     authorize(a, 'checkin', body.undo ? 'delete' : 'create');
@@ -1113,7 +1114,7 @@ async function route(req: Request): Promise<Response> {
       ]);
       return json({
         ...result,
-        url: `${url.origin}/?team_token=${raw}`,
+        url: `${publicOrigin}/?team_token=${raw}`,
         message:
           'Link creat. Trimite-l personal destinatarului; niciun email nu a fost expediat.',
       });

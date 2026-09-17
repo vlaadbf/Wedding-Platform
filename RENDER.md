@@ -8,7 +8,7 @@ La pornire, `scripts/render-start.mjs` aplică migrațiile D1 locale din `drizzl
 
 - `APP_ORIGIN`: URL-ul public al serviciului.
 - `CONFIG_ENCRYPTION_KEY`: valoare aleatoare de cel puțin 32 de octeți, păstrată stabil pentru a putea decripta setările integrărilor.
-- `BOOTSTRAP_SECRET`: secret temporar folosit o singură dată pentru crearea primului super admin; se elimină după activarea contului.
+- `BOOTSTRAP_SECRET`: secret folosit numai de inițializarea serverului. Pe Render Free rămâne configurat pentru a putea recrea administratorul după pierderea discului efemer; cu un Persistent Disk se poate elimina după activare împreună cu variabilele `SUPER_ADMIN_*`.
 - `SUPER_ADMIN_EMAIL` și `SUPER_ADMIN_PASSWORD`: pe Render Free, recreează automat și idempotent administratorul când baza efemeră pornește goală. Dacă administratorul există deja, parola nu este modificată.
 
 ## Persistență

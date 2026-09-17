@@ -1,5 +1,5 @@
 import { Data, AppError, uid } from '../lib/domain';
-import { one, stmt, hash, token, now, db } from './store';
+import { one, stmt, hash, token, now, db, bindings } from './store';
 import { runtimeSettings } from './integration-settings';
 export async function rate(
   req: Request,
@@ -234,7 +234,7 @@ export async function auth(
             path === 'verify'
               ? 'Verifică adresa de email'
               : 'Recuperează accesul',
-          text: `Deschide ${new URL(req.url).origin}/?account_token=${raw}&purpose=${path}. Linkul expiră într-o oră.`,
+          text: `Deschide ${bindings().APP_ORIGIN?.replace(/\/$/, '') || new URL(req.url).origin}/?account_token=${raw}&purpose=${path}. Linkul expiră într-o oră.`,
         }),
       });
       if (!response.ok)
