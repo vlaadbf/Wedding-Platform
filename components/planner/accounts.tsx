@@ -158,7 +158,7 @@ export function AdminAccounts({
         </div>
         <div className="account-actions">
           <Button variant="outline" onClick={onEvents}>
-            Evenimentele mele
+            Eveniment propriu (opțional)
           </Button>
           <Button variant="outline" onClick={onIntegrations}>Integrări</Button>
           <Button

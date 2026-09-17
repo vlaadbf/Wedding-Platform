@@ -203,7 +203,7 @@ export default function Planner() {
     const data = await api('events/' + id);
     setState(data);
   }, []);
-  const loadEvents = useCallback(async (preferred?: string) => {
+  const loadEvents = useCallback(async (preferred?: string, createWhenEmpty = true) => {
     const d = await api('events');
     setEvents(d.events);
     if (d.events.length) {
@@ -219,7 +219,7 @@ export default function Planner() {
         app_name: 'NuntaNoastră',
         ...JSON.parse(sessionStorage.getItem('event-draft') || '{}'),
       });
-      setModal({ type: 'event' });
+      setModal(createWhenEmpty ? { type: 'event' } : null);
     }
   }, []);
   useEffect(() => {
@@ -562,8 +562,10 @@ export default function Planner() {
         onEvents={() => {
           setAccountScope('');
           setViewedAccount(null);
+          setEventId('');
+          setState(null);
           setAdminView(false);
-          loadEvents().catch((e) => setError(e.message));
+          loadEvents(undefined, false).catch((e) => setError(e.message));
         }}
       />
     );
@@ -829,6 +831,30 @@ export default function Planner() {
         <Empty
           title="Acest cont nu are încă evenimente"
           text={viewedAccount.email}
+        />
+      );
+    if (!eventId && !me.demo && me.platform_role === 'super_admin')
+      return (
+        <Empty
+          title="Nu ai un eveniment personal"
+          text="Crearea unui eveniment este opțională pentru contul de super admin. Poți administra conturile și integrările fără un eveniment propriu."
+          action={
+            <Button
+              onClick={() => {
+                setForm({
+                  currency: 'RON',
+                  timezone: 'Europe/Bucharest',
+                  language: 'ro',
+                  budget: 0,
+                  app_name: 'NuntaNoastră',
+                });
+                setModal({ type: 'event' });
+              }}
+            >
+              <Plus />
+              Creează un eveniment personal
+            </Button>
+          }
         />
       );
     if (!state)
