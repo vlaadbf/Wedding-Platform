@@ -4,7 +4,7 @@ import './design.css';
 import './invitations.css';
 
 export const metadata: Metadata = {
-  title: 'NuntaNoastră · Totul, împreună',
+  title: 'Planora · Totul, împreună',
   robots: { index: false, follow: false },
 };
 

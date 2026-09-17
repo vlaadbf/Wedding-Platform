@@ -36,6 +36,7 @@ import { auth, requireUser, user, rate, secureEqual } from './auth';
 import { createEvent } from './seed';
 import { integrationStatus, localToUTC, tick, webhook } from './integrations';
 import { hasSensitiveDetails, PRIVACY_NOTICE_VERSION } from '../lib/privacy';
+import { isUserTheme } from '../lib/themes';
 const json = (body: unknown, status = 200, extra: Record<string, string> = {}) =>
   Response.json(body, {
     status,
@@ -110,7 +111,7 @@ function eventInput(b: Data) {
     partner1: String(b.partner1 || '').slice(0, 100),
     partner2: String(b.partner2 || '').slice(0, 100),
     expected: Math.min(10000, Math.max(1, Number(b.expected) || 120)),
-    app_name: String(b.app_name || 'NuntaNoastră').slice(0, 80),
+    app_name: String(b.app_name || 'Planora').slice(0, 80),
     privacy_operator: String(b.privacy_operator || '').trim().slice(0, 200),
     privacy_contact: String(b.privacy_contact || '').trim().slice(0, 300),
     status: b.status === 'cancelled' ? 'cancelled' : 'active',
@@ -164,7 +165,7 @@ async function route(req: Request): Promise<Response> {
   }
   if (Number(req.headers.get('content-length') || 0) > 6 * 1024 * 1024)
     throw new AppError(413, 'Fișier prea mare (maximum 5 MB).');
-  if (parts[0] === 'health') return json({ ok: true, service: 'NuntaNoastră' });
+  if (parts[0] === 'health') return json({ ok: true, service: 'Planora' });
   if (parts[0] === 'webhooks' && method === 'POST')
     return json(await webhook(req, parts[1]));
   if (parts[0] === 'jobs' && method === 'POST') {
@@ -222,6 +223,15 @@ async function route(req: Request): Promise<Response> {
   if (parts[0] === 'public') return publicRoute(req, parts[1], body);
   if (parts[0] === 'me') {
     const u = await user(req);
+    if (method === 'PATCH' && parts[1] === 'theme') {
+      if (!u) throw new AppError(401, 'Autentifică-te pentru a continua.');
+      if (!isUserTheme(body.theme))
+        throw new AppError(400, 'Tema selectată nu este disponibilă.');
+      await stmt('UPDATE users SET theme=? WHERE id=?', body.theme, u.id).run();
+      return json({ user: { ...u, theme: body.theme } });
+    }
+    if (method !== 'GET' || parts.length !== 1)
+      throw new AppError(404, 'Acțiune indisponibilă.');
     return json({ user: u });
   }
   let u = await requireUser(req);
@@ -238,7 +248,7 @@ async function route(req: Request): Promise<Response> {
         'Contul clientului este deschis pentru consultare.',
       );
     const target = await one(
-      "SELECT id,email,name,demo,approval_status,platform_role FROM users WHERE id=? AND demo=0 AND platform_role='user'",
+      "SELECT id,email,name,demo,approval_status,platform_role,theme FROM users WHERE id=? AND demo=0 AND platform_role='user'",
       viewing,
     );
     if (!target) throw new AppError(404, 'Cont indisponibil.');

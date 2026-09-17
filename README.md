@@ -1,4 +1,4 @@
-# NuntaNoastră
+# Planora
 
 Aplicație web în română cu backend, bază SQL persistentă, autentificare și control de acces pe eveniment. Include o demonstrație izolată cu 120 de persoane fictive. Numele aplicației se schimbă în Setări.
 

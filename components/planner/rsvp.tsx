@@ -392,7 +392,7 @@ export default function RSVP({ token }: { token: string }) {
           {en ? 'Privacy notice.' : 'Nota de confidențialitate.'}
         </a>
         <br />
-        NuntaNoastră · {en ? 'Together, with care.' : 'Totul, împreună.'}
+        Planora · {en ? 'Together, with care.' : 'Totul, împreună.'}
       </footer>
     </main>
   );

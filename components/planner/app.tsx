@@ -40,6 +40,9 @@ import {
   Loader2,
   X,
   Eye,
+  EyeOff,
+  LockKeyhole,
+  UserRound,
   ExternalLink,
   AlertCircle,
   CheckCircle2,
@@ -195,6 +198,9 @@ export default function Planner() {
     ed = event?.data || {},
     s = state?.summary || {},
     base = 'events/' + eventId;
+  useEffect(() => {
+    document.documentElement.dataset.theme = String(me?.theme || 'sand');
+  }, [me?.theme]);
   const can = (kind: string, action = 'view') =>
     (!viewedAccount || ['view', 'export'].includes(action)) &&
     permission(state?.role, kind, action, state?.grants || {});
@@ -216,7 +222,7 @@ export default function Planner() {
         timezone: 'Europe/Bucharest',
         language: 'ro',
         budget: 0,
-        app_name: 'NuntaNoastră',
+        app_name: 'Planora',
         ...JSON.parse(sessionStorage.getItem('event-draft') || '{}'),
       });
       setModal(createWhenEmpty ? { type: 'event' } : null);
@@ -846,7 +852,7 @@ export default function Planner() {
                   timezone: 'Europe/Bucharest',
                   language: 'ro',
                   budget: 0,
-                  app_name: 'NuntaNoastră',
+                  app_name: 'Planora',
                 });
                 setModal({ type: 'event' });
               }}
@@ -1170,6 +1176,12 @@ export default function Planner() {
               setModal({ type: 'trash' });
             }, '')
           }
+          changeTheme={(theme) =>
+            void run(async () => {
+              const result = await api('me/theme', 'PATCH', { theme });
+              setMe(result.user);
+            }, 'Tema a fost salvată.')
+          }
         />
       );
     if (page === 'team')
@@ -1300,7 +1312,7 @@ export default function Planner() {
               <Heart size={21} />
             </span>
             <span>
-              {ed.app_name || 'NuntaNoastră'}
+              {ed.app_name || 'Planora'}
               <small>TOTUL, ÎMPREUNĂ</small>
             </span>
           </a>
@@ -1526,7 +1538,7 @@ export default function Planner() {
           {renderPage()}
         </div>
         <footer className="app-footer">
-          <span>{ed.app_name || 'NuntaNoastră'}</span>
+          <span>{ed.app_name || 'Planora'}</span>
           <span>Planificat cu grijă. Trăit cu bucurie.</span>
           <Heart size={13} />
         </footer>
@@ -2250,69 +2262,74 @@ function AuthScreen({
 }) {
   const [mode, setMode] = useState('login'),
     [form, setForm] = useState<Data>({}),
-    [notice, setNotice] = useState('');
+    [notice, setNotice] = useState(''),
+    [showPassword, setShowPassword] = useState(false);
+  const switchMode = (nextMode: string) => {
+    setMode(nextMode);
+    setForm({});
+    setNotice('');
+    setShowPassword(false);
+  };
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.has('account_token')) {
       queueMicrotask(() => { setMode('consume'); setForm({ token: params.get('account_token') }); });
     }
   }, []);
+  const title =
+    mode === 'register'
+      ? 'Începeți povestea voastră'
+      : mode === 'recover'
+        ? 'Recuperează accesul'
+        : mode === 'consume'
+          ? 'Alege o parolă nouă'
+          : 'Bine ai revenit';
+  const description =
+    mode === 'register'
+      ? 'Contul va fi activ după aprobarea administratorului.'
+      : mode === 'recover'
+        ? 'Îți trimitem un link sigur pentru a reveni în cont.'
+        : mode === 'consume'
+          ? 'Setează parola cu care vei intra de acum înainte.'
+          : 'Continuăm de unde ai rămas.';
   return (
     <div className="auth-shell">
-      <section className="auth-story">
-        <div className="brand">
+      <main className="auth-panel">
+        <header className="auth-brand">
           <span className="brand-icon">
-            <Heart />
+            <Heart strokeWidth={1.7} />
           </span>
-          NuntaNoastră
-        </div>
-        <div>
-          <div className="eyebrow">UN NOU CAPITOL, ÎMPREUNĂ</div>
-          <h1>
-            Voi vă iubiți.
-            <br />
-            Planurile își
-            <br />
-            găsesc locul.
-          </h1>
-          <p>
-            Invitați, momente, oameni dragi și toate detaliile dintre ele. Un
-            singur spațiu pentru ziua voastră.
-          </p>
-          <div className="auth-features">
-            <span>
-              <Users />
-              Invitați & RSVP
-            </span>
-            <span>
-              <Armchair />
-              Planul meselor
-            </span>
-            <span>
-              <Wallet />
-              Buget & plăți
-            </span>
+          <span>Planora</span>
+        </header>
+
+        <section className="auth-intro">
+          <span className="auth-rule" aria-hidden="true" />
+          <h1>{title}</h1>
+          <p>{description}</p>
+        </section>
+
+        {(mode === 'login' || mode === 'register') && (
+          <div className="auth-mode-switch" role="tablist" aria-label="Tipul de acces">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === 'login'}
+              onClick={() => switchMode('login')}
+            >
+              Intră în cont
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === 'register'}
+              onClick={() => switchMode('register')}
+            >
+              Creează cont
+            </button>
           </div>
-        </div>
-        <small>Planificat cu grijă. Trăit cu bucurie.</small>
-      </section>
-      <section className="auth-form-area">
-        <div className="auth-form">
-          <Heart className="auth-heart" />
-          <h2>
-            {mode === 'register'
-              ? 'Povestea voastră începe aici'
-              : mode === 'recover'
-                ? 'Recuperează accesul'
-                : mode === 'consume'
-                  ? 'Confirmă accesul'
-                  : 'Bine ai revenit'}
-          </h2>
-          <p>
-            {mode === 'register'
-              ? 'Creează un cont. Accesul se activează după aprobarea de către super admin.'
-              : 'Un loc pentru toate planurile voastre.'}
-          </p>
+        )}
+
+        <section className="auth-form">
           {error && (
             <div className="form-error" role="alert">
               {error}
@@ -2339,38 +2356,67 @@ function AuthScreen({
           >
             {notice && <output>{notice}</output>}
             {mode === 'register' && (
-              <FieldControl
-                field={{ key: 'name', label: 'Numele tău', required: true }}
-                value={form.name}
-                onChange={(v) => setForm({ ...form, name: v })}
-              />
-            )}{' '}
+              <div className="auth-field">
+                <label htmlFor="auth-name">Numele tău</label>
+                <span className="auth-input-wrap">
+                  <UserRound aria-hidden="true" />
+                  <Input
+                    id="auth-name"
+                    name="name"
+                    autoComplete="name"
+                    required
+                    placeholder="ex. Andrei Popescu"
+                    value={String(form.name || '')}
+                    onChange={(event) => setForm({ ...form, name: event.target.value })}
+                  />
+                </span>
+              </div>
+            )}
             {mode !== 'consume' && (
-              <FieldControl
-                field={{
-                  key: 'email',
-                  label: 'Adresa de email',
-                  type: 'email',
-                  required: true,
-                }}
-                value={form.email}
-                onChange={(v) => setForm({ ...form, email: v })}
-              />
-            )}{' '}
+              <div className="auth-field">
+                <label htmlFor="auth-email">Adresa de email</label>
+                <span className="auth-input-wrap">
+                  <Mail aria-hidden="true" />
+                  <Input
+                    id="auth-email"
+                    name="email"
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    required
+                    placeholder="ex. nume@exemplu.ro"
+                    value={String(form.email || '')}
+                    onChange={(event) => setForm({ ...form, email: event.target.value })}
+                  />
+                </span>
+              </div>
+            )}
             {mode !== 'recover' && (
-              <FieldControl
-                field={{
-                  key: 'password',
-                  label:
-                    mode === 'register' || mode === 'consume'
-                      ? 'Parolă (minimum 12 caractere)'
-                      : 'Parolă',
-                  type: 'password',
-                  required: true,
-                }}
-                value={form.password}
-                onChange={(v) => setForm({ ...form, password: v })}
-              />
+              <div className="auth-field">
+                <label htmlFor="auth-password">{mode === 'register' || mode === 'consume' ? 'Parolă (minimum 12 caractere)' : 'Parolă'}</label>
+                <span className="auth-input-wrap">
+                  <LockKeyhole aria-hidden="true" />
+                  <Input
+                    id="auth-password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                    minLength={12}
+                    required
+                    placeholder="Introdu parola ta"
+                    value={String(form.password || '')}
+                    onChange={(event) => setForm({ ...form, password: event.target.value })}
+                  />
+                  <button
+                    type="button"
+                    className="auth-password-toggle"
+                    onClick={() => setShowPassword((visible) => !visible)}
+                    aria-label={showPassword ? 'Ascunde parola' : 'Arată parola'}
+                  >
+                    {showPassword ? <EyeOff /> : <Eye />}
+                  </button>
+                </span>
+              </div>
             )}
             <Button className="auth-submit" type="submit" disabled={busy}>
               {busy ? (
@@ -2387,37 +2433,42 @@ function AuthScreen({
               <ArrowRight />
             </Button>
           </form>
-          <div className="auth-links">
-            <button
-              onClick={() =>
-                setMode(mode === 'register' ? 'login' : 'register')
-              }
-            >
-              {mode === 'register'
-                ? 'Ai deja cont? Autentifică-te'
-                : 'Nu ai cont? Înregistrează-te'}
+
+          {mode === 'login' && (
+            <button className="auth-text-link auth-recover" type="button" onClick={() => switchMode('recover')}>
+              Ai uitat parola?
             </button>
-            <button onClick={() => setMode('recover')}>Ai uitat parola?</button>
-          </div>
-          <div className="or-divider">
-            <span>sau descoperă aplicația</span>
-          </div>
-          <Button
-            className="demo-button"
-            variant="outline"
-            disabled={busy}
-            onClick={() => onAction('demo', {})}
-          >
-            <Flower2 />
-            Explorează nunta Sofiei & a lui Andrei
-          </Button>
-          <p className="auth-note">
-            Demo cu date fictive și salvare reală.
-            <br />
-            Nu trimite mesaje și nu procesează bani.
-          </p>
-        </div>
-      </section>
+          )}
+          {(mode === 'recover' || mode === 'consume') && (
+            <button className="auth-text-link auth-back" type="button" onClick={() => switchMode('login')}>
+              Înapoi la autentificare
+            </button>
+          )}
+
+          {(mode === 'login' || mode === 'register') && (
+            <>
+              <div className="or-divider" aria-hidden="true">
+                <Heart />
+              </div>
+              <p className="auth-alternate">
+                {mode === 'register' ? 'Ai deja cont?' : 'Nu ai încă un cont?'}{' '}
+                <button type="button" onClick={() => switchMode(mode === 'register' ? 'login' : 'register')}>
+                  {mode === 'register' ? 'Intră în cont' : 'Creează cont'}
+                </button>
+              </p>
+              <Button
+                className="demo-button"
+                variant="outline"
+                disabled={busy}
+                onClick={() => onAction('demo', {})}
+              >
+                <Flower2 />
+                Explorează evenimentul demonstrativ
+              </Button>
+            </>
+          )}
+        </section>
+      </main>
     </div>
   );
 }
@@ -2978,7 +3029,7 @@ export function downloadICS(event: Data, entities: Entity[]) {
   const lines = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//NuntaNoastra//RO',
+    'PRODID:-//Planora//RO',
     'CALSCALE:GREGORIAN',
   ];
   for (const r of [...list(entities, 'timeline'), ...list(entities, 'task')]) {

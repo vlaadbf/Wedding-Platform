@@ -56,7 +56,7 @@ export async function user(req: Request) {
     ?.match(/(?:^|;\s*)nn_session=([^;]+)/)?.[1];
   if (!raw) return null;
   return await one(
-    'SELECT u.id,u.email,u.name,u.verified,u.demo,u.approval_status,u.platform_role FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.hash=? AND s.expires_at>?',
+    'SELECT u.id,u.email,u.name,u.verified,u.demo,u.approval_status,u.platform_role,u.theme FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.hash=? AND s.expires_at>?',
     await hash(raw),
     now(),
   );

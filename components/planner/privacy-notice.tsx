@@ -55,7 +55,7 @@ export function PrivacyNotice({ initialLanguage }: { initialLanguage: 'ro' | 'en
         <p className="muted">
           {en ? 'Notice version' : 'Versiunea notei'}: {PRIVACY_NOTICE_VERSION}
         </p>
-        <Link href="/">{en ? 'Return to NuntaNoastră' : 'Înapoi la NuntaNoastră'}</Link>
+        <Link href="/">{en ? 'Return to Planora' : 'Înapoi la Planora'}</Link>
       </article>
     </main>
   );

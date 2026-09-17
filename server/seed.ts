@@ -19,7 +19,7 @@ export async function createEvent(
     currency: input.currency || 'RON',
     language: input.language || 'ro',
     style: 'Elegant',
-    app_name: 'NuntaNoastră',
+    app_name: 'Planora',
     demo,
     partner1: input.partner1 || '',
     partner2: input.partner2 || '',
