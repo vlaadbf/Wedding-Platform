@@ -99,18 +99,25 @@ export async function adminAccounts(
   }
   if (parts[1] !== 'accounts') throw new AppError(404, 'Pagină indisponibilă.');
   if (method === 'GET' && parts.length === 2) {
-    const status = url.searchParams.get('status') || 'pending';
-    if (!['pending', 'approved', 'rejected'].includes(status))
+    const status = url.searchParams.get('status') || 'all';
+    if (!['all', 'pending', 'approved', 'rejected'].includes(status))
       throw new AppError(400, 'Status invalid.');
     const page = Math.max(
       1,
       Math.floor(Number(url.searchParams.get('page')) || 1),
     );
-    const accounts = await all(
-      'SELECT id,name,email,approval_status,platform_role,created_at,reviewed_at FROM users WHERE demo=0 AND approval_status=? ORDER BY created_at,id LIMIT 51 OFFSET ?',
-      status,
-      (page - 1) * 50,
-    );
+    const offset = (page - 1) * 50;
+    const accounts =
+      status === 'all'
+        ? await all(
+            "SELECT id,name,email,approval_status,platform_role,created_at,reviewed_at FROM users WHERE demo=0 AND platform_role='user' ORDER BY created_at DESC,id LIMIT 51 OFFSET ?",
+            offset,
+          )
+        : await all(
+            "SELECT id,name,email,approval_status,platform_role,created_at,reviewed_at FROM users WHERE demo=0 AND platform_role='user' AND approval_status=? ORDER BY created_at DESC,id LIMIT 51 OFFSET ?",
+            status,
+            offset,
+          );
     return {
       accounts: accounts.slice(0, 50),
       hasMore: accounts.length > 50,

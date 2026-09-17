@@ -1,7 +1,8 @@
 'use client';
 import { useCallback, useEffect, useState, useRef } from 'react';
-import { ShieldCheck, Clock, LogOut } from 'lucide-react';
+import { ShieldCheck, Clock, LogOut, Eye, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Data } from '@/lib/domain';
 import { api } from './controls';
 
@@ -100,8 +101,9 @@ export function AdminAccounts({
   onAccount: (account: Data) => Promise<void>;
   onIntegrations: () => void;
 }) {
-  const [status, setStatus] = useState('pending');
+  const [status, setStatus] = useState('all');
   const [page, setPage] = useState(1);
+  const [query, setQuery] = useState('');
   const [data, setData] = useState<Data>({ accounts: [], hasMore: false });
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -146,6 +148,17 @@ export function AdminAccounts({
       setBusy(false);
     }
   }
+  const accounts = data.accounts.filter((account: Data) =>
+    [account.name, account.email]
+      .join(' ')
+      .toLowerCase()
+      .includes(query.trim().toLowerCase()),
+  );
+  const statusLabel: Record<string, string> = {
+    pending: 'În așteptare',
+    approved: 'Aprobat',
+    rejected: 'Respins',
+  };
   return (
     <main className="account-admin">
       <header className="account-admin-header">
@@ -176,13 +189,24 @@ export function AdminAccounts({
         </div>
       </header>
       <section className="panel account-card">
-        <h2>Cereri de acces</h2>
+        <h2>Conturi clienți</h2>
         <p>
-          Aprobă conturile înainte ca utilizatorii să poată accesa aplicația.
-          Conturile demonstrative nu apar în această listă.
+          Găsește clientul și apasă <strong>Deschide contul</strong> pentru a-i
+          consulta evenimentele. Bara de sus te aduce oricând înapoi la această
+          listă.
         </p>
+        <div className="account-search">
+          <Search size={18} aria-hidden="true" />
+          <Input
+            aria-label="Caută un cont"
+            placeholder="Caută după nume sau email…"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </div>
         <div className="account-actions" aria-label="Filtre conturi">
           {[
+            ['all', 'Toate conturile'],
             ['pending', 'În așteptare'],
             ['approved', 'Aprobate'],
             ['rejected', 'Respinse'],
@@ -241,27 +265,33 @@ export function AdminAccounts({
           <output>Încărcăm conturile…</output>
         ) : (
           <>
-            {!data.accounts.length && !error && (
-              <p>Nu există conturi în această categorie.</p>
+            {!accounts.length && !error && (
+              <p>
+                {query
+                  ? 'Nu am găsit niciun cont pentru această căutare.'
+                  : 'Nu există conturi în această categorie.'}
+              </p>
             )}
             <div className="account-list">
-              {data.accounts.map((account: Data) => (
+              {accounts.map((account: Data) => (
                 <article key={account.id} className="account-row">
                   <div>
                     <strong>{account.name}</strong>
                     <p>{account.email}</p>
                     <small>
+                      <span className={`account-status account-status-${account.approval_status}`}>
+                        {statusLabel[account.approval_status] || account.approval_status}
+                      </span>
+                      {' · '}
                       Creat:{' '}
                       {new Date(account.created_at).toLocaleString('ro-RO')}
-                      {account.platform_role === 'super_admin'
-                        ? ' · Super admin'
-                        : ''}
                     </small>
                   </div>
-                  {account.platform_role === 'user' && (
+                  <div className="account-row-actions">
                     <Button
-                      variant="outline"
+                      variant={account.approval_status === 'approved' ? 'default' : 'outline'}
                       disabled={busy}
+                      aria-label={`Deschide contul ${account.name}`}
                       onClick={async () => {
                         setBusy(true);
                         setError('');
@@ -278,11 +308,11 @@ export function AdminAccounts({
                         }
                       }}
                     >
+                      <Eye />
                       Deschide contul
                     </Button>
-                  )}
-                  {status === 'pending' && account.platform_role === 'user' && (
-                    <div className="account-actions">
+                    {account.approval_status === 'pending' && (
+                      <div className="account-actions">
                       <Button
                         disabled={busy}
                         onClick={() =>
@@ -300,8 +330,9 @@ export function AdminAccounts({
                       >
                         Respinge
                       </Button>
-                    </div>
-                  )}
+                      </div>
+                    )}
+                  </div>
                 </article>
               ))}
             </div>
