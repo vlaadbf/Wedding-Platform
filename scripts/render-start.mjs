@@ -82,3 +82,61 @@ server.on('exit', (code, signal) => {
   if (signal) process.kill(process.pid, signal);
   else process.exit(code ?? 1);
 });
+
+async function provisionSuperAdmin() {
+  const email = process.env.SUPER_ADMIN_EMAIL?.trim().toLowerCase();
+  const password = process.env.SUPER_ADMIN_PASSWORD;
+  const secret = process.env.BOOTSTRAP_SECRET;
+  if (!email && !password) return;
+  if (!email || !password || !secret)
+    throw new Error(
+      'SUPER_ADMIN_EMAIL, SUPER_ADMIN_PASSWORD and BOOTSTRAP_SECRET must be configured together.',
+    );
+
+  const origin = `http://127.0.0.1:${port}`;
+  let ready = false;
+  for (let attempt = 0; attempt < 60; attempt++) {
+    try {
+      const response = await fetch(`${origin}/api/health`);
+      if (response.ok) {
+        ready = true;
+        break;
+      }
+    } catch {}
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 1000));
+  }
+  if (!ready) throw new Error('The application did not become ready for admin provisioning.');
+
+  const bootstrap = await fetch(`${origin}/api/admin/bootstrap`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${secret}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email, name: 'Vlad Bulau' }),
+  });
+  if (bootstrap.status === 409) {
+    console.log(`Super admin already provisioned: ${email}`);
+    return;
+  }
+  if (!bootstrap.ok)
+    throw new Error(`Super admin bootstrap failed with status ${bootstrap.status}.`);
+
+  const result = await bootstrap.json();
+  const activation = new URL(result.activation_url);
+  const token = activation.searchParams.get('account_token');
+  const consume = await fetch(`${origin}/api/auth/consume`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token, password }),
+  });
+  if (!consume.ok)
+    throw new Error(`Super admin activation failed with status ${consume.status}.`);
+  console.log(`Super admin provisioned: ${email}`);
+}
+
+provisionSuperAdmin().catch((error) => {
+  console.error(error instanceof Error ? error.message : String(error));
+  server.kill('SIGTERM');
+  process.exitCode = 1;
+});

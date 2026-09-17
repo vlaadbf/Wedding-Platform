@@ -17,3 +17,7 @@ services:
         generateValue: true
       - key: BOOTSTRAP_SECRET
         generateValue: true
+      - key: SUPER_ADMIN_EMAIL
+        sync: false
+      - key: SUPER_ADMIN_PASSWORD
+        sync: false
