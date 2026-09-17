@@ -11,6 +11,11 @@ Necesită Node.js 22.13+ (testat cu 24.19), pnpm și, pentru testul SQLite / bac
 ```powershell
 pnpm install
 pnpm exec wrangler d1 execute DB --local --config "$PWD/wrangler.local.jsonc" --file "$PWD/drizzle/0000_initial.sql"
+pnpm exec wrangler d1 execute DB --local --config "$PWD/wrangler.local.jsonc" --file "$PWD/drizzle/0001_account_approval.sql"
+pnpm exec wrangler d1 execute DB --local --config "$PWD/wrangler.local.jsonc" --file "$PWD/drizzle/0002_integration_settings.sql"
+pnpm exec wrangler d1 execute DB --local --config "$PWD/wrangler.local.jsonc" --file "$PWD/drizzle/0003_token_expiry.sql"
+pnpm exec wrangler d1 execute DB --local --config "$PWD/wrangler.local.jsonc" --file "$PWD/drizzle/0004_hardening.sql"
+node scripts/init-integration-key.mjs
 pnpm dev
 ```
 
@@ -20,11 +25,23 @@ Butonul **Explorează nunta Sofiei & a lui Andrei** creează un cont demo cu coo
 
 ## Verificări
 
+Conturile reale noi necesită aprobarea super adminului. Demo-ul este separat și nu afișează administrarea conturilor. Pentru configurarea inițială locală: `node scripts/provision-admin.mjs adresa-administratorului`. Un cont nou primește un link privat de setare a parolei în `outputs/super-admin-activation.txt`, valabil 24 de ore; un cont existent folosește parola existentă. Nu există parolă implicită și primul utilizator înregistrat nu primește automat drepturi administrative. Migrația `0001` se aplică o singură dată inclusiv pe baza existentă; conturile reale existente vor necesita aprobare. Vezi [fluxul de aprobare](docs/ACCOUNT-APPROVAL.md).
+
 Cu serverul local pornit:
 
 ```powershell
 pnpm exec tsc --noEmit
+pnpm lint
 node tests/e2e.mjs
+node tests/approval.mjs
+node tests/family-rsvp.mjs
+node tests/invitation-templates.mjs
+node tests/integrations.mjs
+node tests/maintenance.mjs
+node tests/bootstrap.mjs
+node tests/security-headers.mjs
+node tests/tick-performance.mjs
+node tests/floor-geometry.mjs
 python tests/database.py
 pnpm build
 ```
@@ -45,11 +62,14 @@ Registrul entităților folosește payloaduri JSON tipizate și validate, cu rel
 
 ## Configurare și livrare
 
-Copiază `.env.example` în `.dev.vars` pentru dezvoltare locală. Nu include credențiale în Git. Pentru găzduire setează valorile în configurația secretă a mediului.
+Copiază `.env.example` în `.dev.vars` doar dacă fișierul local nu există deja. Nu suprascrie cheia generată de `scripts/init-integration-key.mjs`. Nu include credențiale în Git. Pentru găzduire păstrează cheia de criptare în configurația secretă a mediului; cheile furnizorilor se gestionează din **Administrare conturi → Integrări**. Migrațiile se aplică o singură dată, în ordine.
+
+`node scripts/optimize-invitation-art.mjs` regenerează variantele AVIF și WebP ale ilustrațiilor la 640, 1280 și 1920 px. Fișierele rezultate sunt versionate; comanda se rulează după înlocuirea imaginilor sursă.
 
 - [Arhitectură și plan](docs/IMPLEMENTATION.md)
 - [API](docs/API.md)
 - [Integrări și surse oficiale](docs/INTEGRATIONS.md)
+- [Colecția de invitații și imaginile generate](docs/INVITATION-COLLECTION.md)
 - [Deploy, procese de fundal, backup și restaurare](docs/OPERATIONS.md)
 - [Ghid pentru organizatori](docs/ORGANIZER-GUIDE.md)
 - [Limitări și lucru rămas](docs/LIMITATIONS.md)

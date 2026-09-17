@@ -1,13 +1,19 @@
 import { Data, AppError, uid } from '../lib/domain';
-import { one, stmt, hash, token, now, db, bindings } from './store';
-export async function rate(req: Request, scope: string, limit = 30) {
+import { one, stmt, hash, token, now, db } from './store';
+import { runtimeSettings } from './integration-settings';
+export async function rate(
+  req: Request,
+  scope: string,
+  limit = 30,
+  windowSeconds = 60,
+) {
   const ip = req.headers.get('cf-connecting-ip') || 'local';
-  const bucket = Math.floor(Date.now() / 60000);
+  const bucket = Math.floor(Date.now() / 1000 / windowSeconds);
   const key = await hash(scope + ':' + ip + ':' + bucket);
   const r = await stmt(
     'INSERT INTO rate_limits(key,count,expires_at) VALUES(?,1,?) ON CONFLICT(key) DO UPDATE SET count=count+1 RETURNING count',
     key,
-    bucket * 60 + 120,
+    bucket * windowSeconds + windowSeconds * 2,
   ).first<Data>();
   if (r!.count > limit)
     throw new AppError(429, 'Prea multe încercări. Reîncearcă peste un minut.');
@@ -50,14 +56,22 @@ export async function user(req: Request) {
     ?.match(/(?:^|;\s*)nn_session=([^;]+)/)?.[1];
   if (!raw) return null;
   return await one(
-    'SELECT u.id,u.email,u.name,u.verified,u.demo FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.hash=? AND s.expires_at>?',
+    'SELECT u.id,u.email,u.name,u.verified,u.demo,u.approval_status,u.platform_role FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.hash=? AND s.expires_at>?',
     await hash(raw),
     now(),
   );
 }
-export async function requireUser(req: Request) {
+export async function requireUser(req: Request, allowPending = false) {
   const u = await user(req);
   if (!u) throw new AppError(401, 'Autentifică-te pentru a continua.');
+  if (!allowPending && !u.demo && u.approval_status !== 'approved')
+    throw new AppError(
+      403,
+      u.approval_status === 'rejected'
+        ? 'Cererea de acces a fost respinsă de super admin.'
+        : 'Contul tău este în așteptarea aprobării de către super admin.',
+      'account_' + u.approval_status,
+    );
   return u;
 }
 export async function session(u: Data, req: Request) {
@@ -77,7 +91,22 @@ export async function auth(
   path: string,
   body: Data,
 ): Promise<{ body: Data; cookie?: string }> {
-  await rate(req, 'auth', 15);
+  if (path === 'demo') {
+    const settings = await runtimeSettings();
+    const hourlyLimit = Number(settings.DEMO_LIMIT_PER_HOUR) || 3;
+    const globalCap = Number(settings.DEMO_GLOBAL_CAP) || 200;
+    await rate(req, 'demo', hourlyLimit, 3600);
+    const active = await one(
+      'SELECT COUNT(DISTINCT u.id) AS count FROM users u JOIN sessions s ON s.user_id=u.id WHERE u.demo=1 AND s.expires_at>?',
+      now(),
+    );
+    if (Number(active?.count) >= globalCap)
+      throw new AppError(
+        503,
+        'Numărul maxim de demonstrații active a fost atins. Reîncearcă mai târziu.',
+        'demo_capacity_reached',
+      );
+  } else await rate(req, 'auth', 15);
   if (path === 'logout') {
     const raw = req.headers.get('cookie')?.match(/nn_session=([^;]+)/)?.[1];
     if (raw)
@@ -128,7 +157,15 @@ export async function auth(
         409,
         'Acest cont există deja. Folosește autentificarea sau recuperarea accesului.',
       );
-    const u = { id: uid(), email, name, demo: 0, verified: 0 };
+    const u = {
+      id: uid(),
+      email,
+      name,
+      demo: 0,
+      verified: 0,
+      approval_status: 'pending',
+      platform_role: 'user',
+    };
     await stmt(
       'INSERT INTO users(id,email,name,password,created_at) VALUES(?,?,?,?,?)',
       u.id,
@@ -160,14 +197,15 @@ export async function auth(
   if (path === 'recover' || path === 'verify') {
     const u =
       path === 'verify'
-        ? await requireUser(req)
+        ? await requireUser(req, true)
         : await one(
             'SELECT * FROM users WHERE email=?',
             String(body.email || '')
               .trim()
               .toLowerCase(),
           );
-    if (!bindings().RESEND_API_KEY || !bindings().EMAIL_FROM)
+    const settings = await runtimeSettings();
+    if (!settings.RESEND_API_KEY || !settings.EMAIL_FROM)
       throw new AppError(
         503,
         'Integrarea email nu este configurată. Contactează administratorul pentru activare.',
@@ -185,12 +223,12 @@ export async function auth(
       const response = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${bindings().RESEND_API_KEY}`,
+          Authorization: `Bearer ${settings.RESEND_API_KEY}`,
           'Content-Type': 'application/json',
           'Idempotency-Key': uid(),
         },
         body: JSON.stringify({
-          from: bindings().EMAIL_FROM,
+          from: settings.EMAIL_FROM,
           to: [u.email],
           subject:
             path === 'verify'
@@ -230,11 +268,19 @@ export async function auth(
         String(body.password).length > 256
       )
         throw new AppError(400, 'Parola trebuie să aibă 12–256 caractere.');
-      sql = stmt(
-        'UPDATE users SET password=? WHERE id=?',
-        await password(body.password),
-        t.user_id,
-      );
+      sql =
+        t.purpose === 'setup'
+          ? stmt(
+              "UPDATE users SET password=?,approval_status='approved',reviewed_by=id,reviewed_at=? WHERE id=? AND platform_role='super_admin'",
+              await password(body.password),
+              now(),
+              t.user_id,
+            )
+          : stmt(
+              'UPDATE users SET password=? WHERE id=?',
+              await password(body.password),
+              t.user_id,
+            );
     }
     const claimed = await stmt(
       'UPDATE account_tokens SET used_at=? WHERE hash=? AND used_at IS NULL RETURNING hash',

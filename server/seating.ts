@@ -1,5 +1,5 @@
-import { Data, Entity, AppError, uid, list } from '../lib/domain';
-import { insertEntity, stmt, mutate, now, all, enforce } from './store';
+import { Data, Entity, AppError, list } from '../lib/domain';
+import { insertEntity, stmt, mutate, now } from './store';
 const kinds = ['table', 'assignment', 'decor', 'constraint'];
 export function suggestions(es: Entity[], sub: string) {
   const tables = list(es, 'table').filter((t) => t.data.subevent_id === sub);
@@ -132,7 +132,6 @@ export async function restorePlan(
       event,
     ),
   ];
-  const snapshotIds = new Set(snapshot.map((x) => x.id));
   for (const row of snapshot) {
     if (!kinds.includes(row.kind))
       throw new AppError(400, 'Versiune invalidă.');

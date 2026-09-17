@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import './design.css';
+import './invitations.css';
 
 export const metadata: Metadata = {
   title: 'NuntaNoastră · Totul, împreună',

@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.13.0
+          cache: pnpm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec tsc --noEmit
+      - run: pnpm lint
+      - name: Prepare local D1 and secrets
+        run: |
+          for migration in drizzle/*.sql; do
+            pnpm exec wrangler d1 execute DB --local --config "$PWD/wrangler.local.jsonc" --file "$PWD/$migration"
+          done
+          node scripts/init-integration-key.mjs
+      - name: Start application
+        run: |
+          pnpm dev > dev.log 2>&1 &
+          echo $! > dev.pid
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://localhost:3000/api/health > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat dev.log
+          exit 1
+      - name: API and domain tests
+        run: |
+          for test in tests/*.mjs; do
+            echo "Running $test"
+            node "$test"
+          done
+      - run: python tests/database.py
+      - run: pnpm build
+      - name: Application log on failure
+        if: failure()
+        run: cat dev.log || true

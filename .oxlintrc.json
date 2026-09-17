@@ -29,7 +29,9 @@
     "build/**",
     "dist/**",
     "coverage/**",
-    "next-env.d.ts"
+    "next-env.d.ts",
+    "work/**",
+    "outputs/**"
   ],
   "rules": {
     "no-array-constructor": "error",
@@ -47,7 +49,8 @@
     "typescript/ban-ts-comment": "error",
     "typescript/no-deprecated": "error",
     "typescript/no-empty-object-type": "error",
-    "typescript/no-explicit-any": "error",
+    // Entity payloads are heterogeneous and validated at runtime by the registry in lib/domain.ts.
+    "typescript/no-explicit-any": "warn",
     "typescript/no-namespace": "error",
     "typescript/no-require-imports": "error",
     "typescript/no-unnecessary-type-constraint": "error",

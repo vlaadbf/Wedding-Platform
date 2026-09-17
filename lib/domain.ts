@@ -1,3 +1,4 @@
+import { invitationTemplates } from './invitation-templates';
 export type Data = Record<string, any>;
 export type Entity = {
   id: string;
@@ -16,7 +17,7 @@ export type Field = {
   required?: boolean;
   options?: string[];
   ref?: string;
-  default?: any;
+  default?: string | number | boolean;
   max?: number;
 };
 const f = (
@@ -47,6 +48,18 @@ export const schemas: Record<
       name('Numele familiei'),
       f('email', 'Email', 'email'),
       f('phone', 'Telefon', 'tel'),
+      f(
+        'self_registration',
+        'Invitatul completează membrii familiei',
+        'boolean',
+        { default: true },
+      ),
+      f(
+        'max_members',
+        'Locuri rezervate familiei (adulți și copii)',
+        'number',
+        { default: 4, max: 20 },
+      ),
       f('max_companions', 'Însoțitori permiși', 'number', {
         default: 0,
         max: 10,
@@ -56,6 +69,14 @@ export const schemas: Record<
         default: 'ro',
       }),
       f('opt_out', 'Nu trimite comunicări', 'boolean'),
+    ],
+  },
+  family_response: {
+    label: 'Răspunsuri familii',
+    singular: 'Răspuns familie',
+    fields: [
+      ref('household_id', 'Familie', 'household'),
+      f('status', 'Răspuns', 'select', { options: ['declined', 'responded'] }),
     ],
   },
   guest: {
@@ -402,6 +423,27 @@ export const schemas: Record<
     singular: 'Design invitație',
     fields: [
       name('Titlu'),
+      f('template_id', 'Model', 'select', {
+        options: ['', ...invitationTemplates.map((t) => t.id)],
+        default: '',
+      }),
+      f('font', 'Font', 'select', {
+        options: ['', 'serif', 'modern', 'editorial', 'romantic'],
+        default: '',
+      }),
+      f('artwork', 'Imagine', 'select', {
+        options: ['auto', 'none', 'botanical', 'riviera', 'afterglow'],
+        default: 'auto',
+      }),
+      f('background', 'Culoare fundal', 'color'),
+      f('text_color', 'Culoare text', 'color'),
+      f('partner1', 'Primul prenume'),
+      f('partner2', 'Al doilea prenume'),
+      f('headline', 'Titlu creativ'),
+      f('masthead', 'Titlu afiș / revistă', 'textarea'),
+      f('eyebrow', 'Text introductiv'),
+      f('closing', 'Încheiere'),
+      f('location', 'Locația afișată'),
       f('style', 'Șablon', 'select', {
         options: [
           'Elegant',
@@ -438,7 +480,7 @@ export const schemas: Record<
         options: ['email', 'sms', 'whatsapp'],
         default: 'email',
       }),
-      f('message', 'Mesaj · {family} {couple} {link}', 'textarea', {
+      f('message', 'Mesaj · {family} {couple} {link} {privacy}', 'textarea', {
         required: true,
       }),
       f('active', 'Activează explicit', 'boolean'),
@@ -508,6 +550,7 @@ export function money(value: number, currency = 'RON', locale = 'ro-RO') {
   }).format((value || 0) / 100);
 }
 export function parseMoney(s: unknown) {
+  if (s != null && typeof s !== 'string' && typeof s !== 'number') throw new AppError(400, 'Sumă invalidă.');
   const v = String(s ?? '0').replace(',', '.');
   if (!/^\d{1,10}(\.\d{1,2})?$/.test(v))
     throw new AppError(400, 'Suma trebuie să aibă cel mult două zecimale.');
@@ -565,11 +608,13 @@ export function validate(kind: string, input: Data): Data {
         throw new AppError(400, 'Ora nu este validă.');
       if (field.options && !field.options.includes(v))
         throw new AppError(400, `${field.label}: opțiune invalidă.`);
-      if (field.type === 'color' && !/^#[\da-fA-F]{6}$/.test(v))
+      if (v && field.type === 'color' && !/^#[\da-fA-F]{6}$/.test(v))
         throw new AppError(400, 'Culoare invalidă.');
     }
     out[field.key] = v;
   }
+  if (kind === 'household' && out.self_registration && out.max_members < 1)
+    throw new AppError(400, 'Rezervă cel puțin un loc pentru familie.');
   return out;
 }
 export const financialKinds = [
@@ -672,8 +717,15 @@ export function summary(rows: Entity[], event: Data) {
   };
 }
 export function csv(rows: Data[], fields: string[]) {
-  const cell = (v: any) => {
-    let s = String(v ?? '');
+  const cell = (v: unknown) => {
+    let s = '';
+    if (v !== null && v !== undefined) {
+      if (typeof v === 'object') s = JSON.stringify(v);
+      else if (typeof v === 'symbol') s = v.description || '';
+      else if (typeof v === 'string') s = v;
+      else if (typeof v === 'number' || typeof v === 'boolean' || typeof v === 'bigint')
+        s = `${v}`;
+    }
     if (/^[=+@\-\t\r]/.test(s)) s = "'" + s;
     return '"' + s.replace(/"/g, '""') + '"';
   };

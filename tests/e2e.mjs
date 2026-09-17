@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { localDatabase } from '../scripts/local-db.mjs';
 const origin = process.env.TEST_ORIGIN || 'http://localhost:3000';
+const testIp = 'qa-e2e-' + crypto.randomUUID();
 let count = 0;
 const report = [];
 async function test(name, fn) {
@@ -17,9 +20,10 @@ class Client {
       method,
       headers: {
         'Content-Type': 'application/json',
+        'cf-connecting-ip': testIp,
         ...(this.cookie ? { cookie: this.cookie } : {}),
       },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      ...(method !== 'GET' && body !== undefined ? { body: JSON.stringify(body) } : {}),
     });
     if (r.headers.get('set-cookie'))
       this.cookie = r.headers.get('set-cookie').split(';')[0];
@@ -98,6 +102,16 @@ await test('Acces API neautorizat și cross-event ref respinse', async () => {
     name: 'QA recepție',
     password: 'Fictitious-QA-passphrase-2026',
   });
+  // Trusted local fixture setup: production accounts require the admin API.
+  if (!['localhost', '127.0.0.1'].includes(new URL(origin).hostname))
+    throw new Error('Local fixtures only.');
+  const fixtureDB = localDatabase();
+  fixtureDB
+    .prepare(
+      "UPDATE users SET approval_status='approved',reviewed_at=? WHERE id=?",
+    )
+    .run(new Date().toISOString(), d.user.id);
+  fixtureDB.close();
   await b.call('events/' + a.event, 'GET', undefined, 403);
   await a.add(
     'guest',
@@ -190,6 +204,8 @@ await test('Programare persistentă cu activare explicită și fără dubluri', 
   const s = await a.load();
   assert.equal(s.jobs.length, 1);
   assert.equal(s.jobs[0].status, 'queued');
+  link = (await a.change('invite-link', { household_id: family })).url;
+  await a.load();
 });
 await test('Portalul respinge persoanele și momentele neautorizate', async () => {
   const path = 'public/' + link.split('/').pop();
@@ -470,40 +486,127 @@ await test('Endpointul joburilor și webhookurile resping accesul neautorizat', 
   await anon.call('jobs', 'POST', {}, 401);
   await anon.call('webhooks/resend', 'POST', {}, 503);
 });
-await test('API-ul paginat de recepție elimină contactele și alergiile', async()=>{
-  const result=await b.call('events/'+a.event+'/records/guest');
-  assert(result.items.every(g=>!('email' in g.data)&&!('allergies' in g.data)));
-  const evs=await b.call('events');assert(evs.events.every(e=>!('budget' in e.data)));
+await test('API-ul paginat de recepție elimină contactele și alergiile', async () => {
+  const result = await b.call('events/' + a.event + '/records/guest');
+  assert(
+    result.items.every((g) => !('email' in g.data) && !('allergies' in g.data)),
+  );
+  const evs = await b.call('events');
+  assert(evs.events.every((e) => !('budget' in e.data)));
 });
-await test('Exportul XLSX produce un registru valid, autorizat',async()=>{
-  const r=await fetch(origin+'/api/events/'+a.event+'/export?kind=guest&format=xlsx',{headers:{cookie:a.cookie}});
-  assert.equal(r.status,200);const bytes=Buffer.from(await r.arrayBuffer());assert.equal(bytes.subarray(0,2).toString(),'PK');
-  const {default:ExcelJS}=await import('exceljs');const book=new ExcelJS.Workbook();await book.xlsx.load(bytes);assert.equal(book.worksheets[0].rowCount,3);
+await test('Exportul XLSX produce un registru valid, autorizat', async () => {
+  const r = await fetch(
+    origin + '/api/events/' + a.event + '/export?kind=guest&format=xlsx',
+    { headers: { cookie: a.cookie } },
+  );
+  assert.equal(r.status, 200);
+  const bytes = Buffer.from(await r.arrayBuffer());
+  assert.equal(bytes.subarray(0, 2).toString(), 'PK');
+  const { default: ExcelJS } = await import('exceljs');
+  const book = new ExcelJS.Workbook();
+  await book.xlsx.load(bytes);
+  assert.equal(book.worksheets[0].rowCount, 3);
 });
-await test('Planul salvează versiuni și restaurează fără dublarea locurilor',async()=>{
-  const t=(await a.add('table',{name:'Masa versiuni',subevent_id:sub,capacity:4,x:100,y:100})).id;
-  const saved=await a.change('floor',{action:'save'});await a.load();
-  const original=(await a.load()).entities.find(e=>e.id===t);
-  await a.call('events/'+a.event+'/records/table/'+t,'PATCH',{version:a.version,data:{...original.data,x:300}});await a.load();
-  await a.change('floor',{action:'restore',id:saved.id});assert.equal((await a.load()).entities.find(e=>e.id===t).data.x,100);
-  const preview=await a.change('floor',{action:'suggest',preview:true});assert.equal(preview.proposed.length,2);
-  await a.change('floor',{action:'suggest',confirm:true});assert.equal((await a.load()).summary.unseated,0);
+await test('Planul salvează versiuni și restaurează fără dublarea locurilor', async () => {
+  const t = (
+    await a.add('table', {
+      name: 'Masa versiuni',
+      subevent_id: sub,
+      capacity: 4,
+      x: 100,
+      y: 100,
+    })
+  ).id;
+  const saved = await a.change('floor', { action: 'save' });
+  await a.load();
+  const original = (await a.load()).entities.find((e) => e.id === t);
+  await a.call('events/' + a.event + '/records/table/' + t, 'PATCH', {
+    version: a.version,
+    data: { ...original.data, x: 300 },
+  });
+  await a.load();
+  await a.change('floor', { action: 'restore', id: saved.id });
+  assert.equal((await a.load()).entities.find((e) => e.id === t).data.x, 100);
+  const preview = await a.change('floor', { action: 'suggest', preview: true });
+  assert.equal(preview.proposed.length, 2);
+  await a.change('floor', { action: 'suggest', confirm: true });
+  assert.equal((await a.load()).summary.unseated, 0);
 });
-await test('Codul QR opac este limitat la eveniment și idempotent',async()=>{
-  const r=await a.change('invite-link',{household_id:family});await a.load();
-  await a.change('checkin',{qr:r.url,subevent_id:sub});await a.load();
-  await a.change('checkin',{qr:r.url,subevent_id:sub});assert.equal((await a.load()).summary.arrived,2);
-  await a.change('checkin',{qr:'0'.repeat(64),subevent_id:sub},404);
+await test('Linkurile RSVP expiră, iar o campanie nouă le revocă pe cele anterioare', async () => {
+  const expired = await a.change('invite-link', { household_id: family });
+  await a.load();
+  const raw = expired.url.split('/').pop();
+  const fixtureDB = localDatabase();
+  fixtureDB
+    .prepare('UPDATE access_tokens SET expires_at=? WHERE hash=?')
+    .run(new Date(Date.now() - 1000).toISOString(), createHash('sha256').update(raw).digest('hex'));
+  fixtureDB.close();
+  await anon.call('public/' + raw, 'GET', undefined, 404);
+  await a.change('checkin', { qr: expired.url, subevent_id: sub }, 404);
+
+  const previous = await a.change('invite-link', { household_id: family });
+  await a.load();
+  await anon.call('public/' + previous.url.split('/').pop());
+  await a.change('campaigns', {
+    activate: true,
+    channel: 'email',
+    type: 'invitation',
+    message: 'Invitație nouă {link}',
+  });
+  await anon.call('public/' + previous.url.split('/').pop(), 'GET', undefined, 404);
+  await a.load();
 });
-await test('Fusul orar și orele DST imposibile / ambigue sunt respinse',async()=>{
-  await a.call('events','POST',{name:'Bad zone',timezone:'Invalid/Zone'},400);
-  await a.change('campaigns',{activate:true,channel:'email',type:'invitation',message:'Test {link}',date:'2027-03-28',time:'03:30'},400);
-  await a.change('campaigns',{activate:true,channel:'email',type:'invitation',message:'Test {link}',date:'2027-10-31',time:'03:30'},400);
+await test('Codul QR opac este limitat la eveniment și idempotent', async () => {
+  const r = await a.change('invite-link', { household_id: family });
+  await a.load();
+  await a.change('checkin', { qr: r.url, subevent_id: sub });
+  await a.load();
+  await a.change('checkin', { qr: r.url, subevent_id: sub });
+  assert.equal((await a.load()).summary.arrived, 2);
+  await a.change('checkin', { qr: '0'.repeat(64), subevent_id: sub }, 404);
 });
-await test('Anularea evenimentului oprește accesul public',async()=>{
-  const r=await a.change('invite-link',{household_id:family});const current=await a.load();
-  await a.call('events/'+a.event,'PATCH',{...current.event.data,name:current.event.name,status:'cancelled',version:a.version});
-  await anon.call('public/'+r.url.split('/').pop(),'GET',undefined,410);
+await test('Fusul orar și orele DST imposibile / ambigue sunt respinse', async () => {
+  await a.call(
+    'events',
+    'POST',
+    { name: 'Bad zone', timezone: 'Invalid/Zone' },
+    400,
+  );
+  await a.change(
+    'campaigns',
+    {
+      activate: true,
+      channel: 'email',
+      type: 'invitation',
+      message: 'Test {link}',
+      date: '2027-03-28',
+      time: '03:30',
+    },
+    400,
+  );
+  await a.change(
+    'campaigns',
+    {
+      activate: true,
+      channel: 'email',
+      type: 'invitation',
+      message: 'Test {link}',
+      date: '2027-10-31',
+      time: '03:30',
+    },
+    400,
+  );
+});
+await test('Anularea evenimentului oprește accesul public', async () => {
+  const r = await a.change('invite-link', { household_id: family });
+  const current = await a.load();
+  await a.call('events/' + a.event, 'PATCH', {
+    ...current.event.data,
+    name: current.event.name,
+    status: 'cancelled',
+    version: a.version,
+  });
+  await anon.call('public/' + r.url.split('/').pop(), 'GET', undefined, 410);
 });
 console.log(
   `\n${count} verificări API trecute. Flux integral demonstrat pe date fictive.`,

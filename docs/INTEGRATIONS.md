@@ -2,11 +2,21 @@
 
 Nicio credențială nu este livrată. Aplicația afișează starea reală a configurării; un cont demo nu apelează transporturile externe, chiar dacă serverul are chei.
 
+## Configurare din aplicație
+
+Pagina **Administrare conturi → Integrări** este disponibilă exclusiv super adminului. Utilizatorii obișnuiți și demo-ul nu primesc configurația nici prin API. Completează cheile și expeditorii pentru Resend, Twilio și procesarea automată, apoi salvează. Un câmp secret lăsat gol păstrează valoarea existentă; eliminarea cere bifarea opțiunii dedicate. Valorile salvate aici au prioritate față de cele din mediul serverului. Ștergerea explicită dezactivează valoarea inclusiv când există una în mediu.
+
+Configurarea este criptată AES-GCM în SQL, iar istoricul păstrează autorul, data și revizia fără secrete. Cheile nu sunt returnate browserului după salvare. Starea „configurat” indică prezența parametrilor, nu validarea lor la furnizor. Conturile, expeditorii și șabloanele aprobate se obțin la furnizori; procesul scheduler se pornește separat, folosind aceeași valoare JOB_SECRET ca în aplicație.
+
+Inițializarea infrastructurii rămâne o operațiune de server: aplică `drizzle/0002_integration_settings.sql` și rulează local `node scripts/init-integration-key.mjs`, apoi repornește serverul. Scriptul adaugă o cheie aleatoare de 32 octeți în `.dev.vars`, fără să o afișeze sau să suprascrie o cheie existentă. În producție setează `CONFIG_ENCRYPTION_KEY` ca secret. Păstrează o copie sigură a acestei chei separat de backupul SQL: fără aceeași cheie configurația criptată nu poate fi restaurată. Nu o roti prin simpla înlocuire a valorii.
+
 ## Email — Resend
 
 Configurează `RESEND_API_KEY`, `EMAIL_FROM` pe un domeniu verificat și `RESEND_WEBHOOK_SECRET`. Webhook: `/api/webhooks/resend`. Sunt validate semnătura Svix și abaterea temporală de maximum 5 minute. Tokenurile de verificare / recuperare sunt valabile o oră.
 
 Fiecare expediere are `Idempotency-Key` egal cu ID-ul jobului. Resend păstrează cheile de idempotență 24 de ore; workerul nu reia automat expedierea după un rezultat incert. HTTP acceptat produce starea `accepted`, nu `delivered`. Numai webhookul de livrare confirmă livrarea. Documentație oficială verificată la implementare: [idempotency keys](https://resend.com/docs/dashboard/emails/idempotency-keys), [API](https://resend.com/docs/api-reference/introduction).
+
+Mesajele campaniilor acceptă variabila `{privacy}`, înlocuită cu adresa paginii publice de confidențialitate. Include-o în șabloanele email prin care se cere RSVP, mai ales când formularul poate colecta alergii sau nevoi de accesibilitate.
 
 ## SMS și WhatsApp — Twilio
 

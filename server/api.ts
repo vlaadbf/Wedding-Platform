@@ -1,4 +1,7 @@
 import { suggestions, snapshotStatements, restorePlan } from './seating';
+import { adminAccounts, bootstrapAdmin } from './admin';
+import { familyPending, saveFamily } from './family-rsvp';
+import { runtimeSettings } from './integration-settings';
 import {
   Data,
   Entity,
@@ -24,14 +27,16 @@ import {
   mutate,
   insertEntity,
   enforce,
+  decode,
   hash,
   token,
   bindings,
 } from './store';
-import { auth, requireUser, user, rate, session, secureEqual } from './auth';
+import { auth, requireUser, user, rate, secureEqual } from './auth';
 import { createEvent } from './seed';
 import { integrationStatus, localToUTC, tick, webhook } from './integrations';
-const json = (body: any, status = 200, extra: Record<string, string> = {}) =>
+import { hasSensitiveDetails, PRIVACY_NOTICE_VERSION } from '../lib/privacy';
+const json = (body: unknown, status = 200, extra: Record<string, string> = {}) =>
   Response.json(body, {
     status,
     headers: {
@@ -41,6 +46,12 @@ const json = (body: any, status = 200, extra: Record<string, string> = {}) =>
       ...extra,
     },
   });
+const invitationExpiry = (eventData: Data) => {
+  const base = eventData.date
+    ? Date.parse(String(eventData.date) + 'T23:59:59.999Z') + 30 * 86400000
+    : Date.now() + 400 * 86400000;
+  return new Date(base).toISOString();
+};
 const redact = (a: Data, x: Entity): Entity =>
   a.role === 'checkin'
     ? {
@@ -100,6 +111,8 @@ function eventInput(b: Data) {
     partner2: String(b.partner2 || '').slice(0, 100),
     expected: Math.min(10000, Math.max(1, Number(b.expected) || 120)),
     app_name: String(b.app_name || 'NuntaNoastră').slice(0, 80),
+    privacy_operator: String(b.privacy_operator || '').trim().slice(0, 200),
+    privacy_contact: String(b.privacy_contact || '').trim().slice(0, 300),
     status: b.status === 'cancelled' ? 'cancelled' : 'active',
   };
 }
@@ -154,7 +167,7 @@ async function route(req: Request): Promise<Response> {
   if (parts[0] === 'webhooks' && method === 'POST')
     return json(await webhook(req, parts[1]));
   if (parts[0] === 'jobs' && method === 'POST') {
-    const secret = bindings().JOB_SECRET;
+    const secret = (await runtimeSettings()).JOB_SECRET;
     if (
       !secret ||
       !secureEqual(req.headers.get('authorization') || '', 'Bearer ' + secret)
@@ -198,12 +211,38 @@ async function route(req: Request): Promise<Response> {
     }
     return json(r.body, 200, r.cookie ? { 'Set-Cookie': r.cookie } : {});
   }
+  if (
+    parts[0] === 'admin' &&
+    parts[1] === 'bootstrap' &&
+    parts.length === 2 &&
+    method === 'POST'
+  )
+    return json(await bootstrapAdmin(req, body, url.origin), 201);
   if (parts[0] === 'public') return publicRoute(req, parts[1], body);
   if (parts[0] === 'me') {
     const u = await user(req);
     return json({ user: u });
   }
-  const u = await requireUser(req);
+  let u = await requireUser(req);
+  if (parts[0] === 'admin')
+    return json(await adminAccounts(u, parts, method, body, url));
+  const viewing =
+    req.headers.get('x-admin-account') || url.searchParams.get('admin_account');
+  if (viewing) {
+    if (u.demo || u.platform_role !== 'super_admin')
+      throw new AppError(403, 'Acces rezervat super adminului.');
+    if (method !== 'GET' || parts[0] !== 'events')
+      throw new AppError(
+        403,
+        'Contul clientului este deschis pentru consultare.',
+      );
+    const target = await one(
+      "SELECT id,email,name,demo,approval_status,platform_role FROM users WHERE id=? AND demo=0 AND platform_role='user'",
+      viewing,
+    );
+    if (!target) throw new AppError(404, 'Cont indisponibil.');
+    u = target;
+  }
   if (parts[0] === 'sessions') {
     if (method === 'DELETE') {
       await stmt('DELETE FROM sessions WHERE user_id=?', u.id).run();
@@ -288,7 +327,10 @@ async function route(req: Request): Promise<Response> {
     a = await access(u, eventId),
     event = a.event;
   const op = parts[2];
-  const es = await rows(eventId);
+  const skipsEntityScan =
+    ['team', 'audit', 'trash', 'documents', 'job-action'].includes(op || '') ||
+    (op === 'records' && method === 'GET');
+  const es = skipsEntityScan ? [] : await rows(eventId);
   const version = Number(body.version);
   if (!op && method === 'GET') {
     const visible = es
@@ -329,7 +371,6 @@ async function route(req: Request): Promise<Response> {
       role: a.role,
       grants: a.grants,
       summary: summary(visible, event.data),
-      integrations: integrationStatus(event.data.demo),
       jobs: permission(a.role, 'campaign', 'view', a.grants)
         ? await all(
             'SELECT id,campaign_id,household_id,channel,type,due_at,status,attempt,error,provider_id FROM jobs WHERE event_id=? ORDER BY created_at DESC LIMIT 300',
@@ -444,17 +485,46 @@ async function route(req: Request): Promise<Response> {
           100,
           Math.max(1, Number(url.searchParams.get('size')) || 25),
         );
-      const filtered = list(es, kind).filter(
-        (x) =>
-          (!q || JSON.stringify(x.data).toLowerCase().includes(q)) &&
-          (!status || x.data.status === status),
+      const where = ["e.event_id=?", "e.kind=?", 'e.deleted_at IS NULL'];
+      const args: unknown[] = [eventId, kind];
+      if (q) {
+        where.push("LOWER(e.data) LIKE ? ESCAPE '\\'");
+        args.push('%' + q.replace(/[\\%_]/g, '\\$&') + '%');
+      }
+      if (status) {
+        if (kind === 'guest') {
+          if (status === 'pending')
+            where.push(
+              "NOT EXISTS(SELECT 1 FROM entities r WHERE r.event_id=e.event_id AND r.kind='rsvp' AND r.deleted_at IS NULL AND json_extract(r.data,'$.guest_id')=e.id AND json_extract(r.data,'$.status') IN ('confirmed','declined'))",
+            );
+          else {
+            where.push(
+              "EXISTS(SELECT 1 FROM entities r WHERE r.event_id=e.event_id AND r.kind='rsvp' AND r.deleted_at IS NULL AND json_extract(r.data,'$.guest_id')=e.id AND json_extract(r.data,'$.status')=?)",
+            );
+            args.push(status);
+          }
+        } else {
+          where.push("json_extract(e.data,'$.status')=?");
+          args.push(status);
+        }
+      }
+      const clause = where.join(' AND ');
+      const total = await one<{ total: number }>(
+        `SELECT COUNT(*) AS total FROM entities e WHERE ${clause}`,
+        ...args,
       );
+      const items = (
+        await all(
+          `SELECT e.* FROM entities e WHERE ${clause} ORDER BY e.created_at,e.id LIMIT ? OFFSET ?`,
+          ...args,
+          size,
+          (page - 1) * size,
+        )
+      ).map(decode);
       return json({
-        total: filtered.length,
+        total: Number(total?.total || 0),
         page,
-        items: filtered
-          .slice((page - 1) * size, page * size)
-          .map((x) => redact(a, x)),
+        items: items.map((x) => redact(a, x)),
       });
     }
     const action = method === 'DELETE' ? 'delete' : id ? 'edit' : 'create';
@@ -707,11 +777,12 @@ async function route(req: Request): Promise<Response> {
     const raw = token();
     const statements = [
       stmt(
-        'INSERT INTO access_tokens(hash,event_id,household_id,created_at) VALUES(?,?,?,?)',
+        'INSERT INTO access_tokens(hash,event_id,household_id,created_at,expires_at) VALUES(?,?,?,?,?)',
         await hash(raw),
         eventId,
         family.id,
         now(),
+        invitationExpiry(event.data),
       ),
     ];
     if (body.revoke)
@@ -757,7 +828,8 @@ async function route(req: Request): Promise<Response> {
     authorize(a, 'campaign', 'send');
     if (
       !event.data.demo &&
-      integrationStatus().find((x) => x.id === body.channel)?.configured &&
+      (await integrationStatus()).find((x) => x.id === body.channel)
+        ?.configured &&
       !u.verified
     )
       throw new AppError(403, 'Verifică adresa de email înainte de expediere.');
@@ -767,8 +839,9 @@ async function route(req: Request): Promise<Response> {
         count: eligible.length,
         excluded: list(es, 'household').length - eligible.length,
         sample: eligible[0]?.data,
-        configured: !!integrationStatus().find((x) => x.id === body.channel)
-          ?.configured,
+        configured: !!(await integrationStatus()).find(
+          (x) => x.id === body.channel,
+        )?.configured,
         demo: !!event.data.demo,
       });
     }
@@ -831,9 +904,10 @@ async function route(req: Request): Promise<Response> {
     if (body.qr) {
       const raw = String(body.qr).split('/').pop();
       const tokenRow = await one(
-        'SELECT household_id FROM access_tokens WHERE hash=? AND event_id=? AND revoked_at IS NULL',
+        'SELECT household_id FROM access_tokens WHERE hash=? AND event_id=? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>?)',
         await hash(raw || ''),
         eventId,
+        now(),
       );
       if (!tokenRow)
         throw new AppError(
@@ -1057,25 +1131,7 @@ function eligibleFamilies(es: Entity[], channel: string, type: string) {
           ? h.data.email
           : /^\+\d{8,15}$/.test(h.data.phone || '')),
     )
-    .filter(
-      (h) =>
-        type !== 'rsvp_reminder' ||
-        list(es, 'guest')
-          .filter((g) => g.data.household_id === h.id)
-          .some((g) =>
-            list(es, 'guest_invitation')
-              .filter((i) => i.data.guest_id === g.id)
-              .some(
-                (i) =>
-                  !list(es, 'rsvp').some(
-                    (r) =>
-                      r.data.guest_id === g.id &&
-                      r.data.subevent_id === i.data.subevent_id &&
-                      r.data.status !== 'pending',
-                  ),
-              ),
-          ),
-    );
+    .filter((h) => type !== 'rsvp_reminder' || familyPending(es, h));
 }
 async function campaignStatements(
   eventId: string,
@@ -1084,7 +1140,7 @@ async function campaignStatements(
   a: Data,
   es: Entity[],
   origin: string,
-  actor: string,
+  _actor: string,
 ) {
   const channel = b.channel || 'email',
     type = b.type || 'invitation';
@@ -1095,7 +1151,7 @@ async function campaignStatements(
     throw new AppError(400, 'Tip de campanie invalid.');
   if (
     !a.event.data.demo &&
-    !integrationStatus().find((x) => x.id === channel)?.configured
+    !(await integrationStatus()).find((x) => x.id === channel)?.configured
   )
     throw new AppError(
       503,
@@ -1104,7 +1160,7 @@ async function campaignStatements(
     );
   if (!a.event.data.published_invitation)
     throw new AppError(400, 'Publică mai întâi designul invitației.');
-  if (!a.event.data.demo && !bindings().JOB_SECRET)
+  if (!a.event.data.demo && !(await runtimeSettings()).JOB_SECRET)
     throw new AppError(503, 'Procesul de fundal nu este configurat.');
   const due = b.date
     ? localToUTC(b.date, b.time || '10:00', a.event.data.timezone)
@@ -1114,16 +1170,28 @@ async function campaignStatements(
   const families = eligibleFamilies(es, channel, type);
   if (!families.length)
     throw new AppError(400, 'Nu există destinatari eligibili.');
+  if (families.length > 150)
+    throw new AppError(
+      400,
+      'Campania are peste 150 de familii eligibile. Împarte destinatarii în segmente mai mici.',
+    );
   const s: D1PreparedStatement[] = [];
   for (const h of families) {
     const raw = token();
     s.push(
       stmt(
-        'INSERT INTO access_tokens(hash,event_id,household_id,created_at) VALUES(?,?,?,?)',
+        'UPDATE access_tokens SET revoked_at=? WHERE event_id=? AND household_id=? AND revoked_at IS NULL',
+        now(),
+        eventId,
+        h.id,
+      ),
+      stmt(
+        'INSERT INTO access_tokens(hash,event_id,household_id,created_at,expires_at) VALUES(?,?,?,?,?)',
         await hash(raw),
         eventId,
         h.id,
         now(),
+        invitationExpiry(a.event.data),
       ),
     );
     const values: Data = {
@@ -1134,9 +1202,10 @@ async function campaignStatements(
       venue: a.event.data.venue,
       deadline: a.event.data.published_invitation.rsvp_deadline,
       link: origin + '/rsvp/' + raw,
+      privacy: origin + '/confidentialitate',
     };
     const text = String(b.message).replace(
-      /\{(family|name|couple|date|venue|deadline|link)\}/g,
+      /\{(family|name|couple|date|venue|deadline|link|privacy)\}/g,
       (_, k) => values[k] || '',
     );
     s.push(
@@ -1167,8 +1236,8 @@ async function importGuests(
 ) {
   authorize(a, 'guest', 'create');
   authorize(a, 'household', 'create');
-  if (!Array.isArray(b.rows) || b.rows.length > 500)
-    throw new AppError(400, 'Importă maximum 500 de persoane o dată.');
+  if (!Array.isArray(b.rows) || b.rows.length > 150)
+    throw new AppError(400, 'Importă maximum 150 de persoane o dată.');
   const report = b.rows.map((row: Data, index: number) => {
     try {
       if (!row.name || !row.family)
@@ -1241,6 +1310,7 @@ async function importGuests(
         eventId,
         'household',
         validate('household', {
+          self_registration: false,
           name: row.family,
           email: row.data.email,
           phone: row.data.phone,
@@ -1286,8 +1356,9 @@ async function publicRoute(req: Request, raw: string, b: Data) {
   if (!/^[a-f0-9]{64}$/.test(raw || ''))
     throw new AppError(404, 'Invitație indisponibilă.');
   const t = await one(
-    'SELECT * FROM access_tokens WHERE hash=? AND revoked_at IS NULL',
+    'SELECT * FROM access_tokens WHERE hash=? AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>?)',
     await hash(raw),
+    now(),
   );
   if (!t)
     throw new AppError(
@@ -1313,8 +1384,10 @@ async function publicRoute(req: Request, raw: string, b: Data) {
   const invitations = list(es, 'guest_invitation').filter((x) =>
     guests.some((g) => g.id === x.data.guest_id),
   );
-  const subs = list(es, 'subevent').filter((s) =>
-    invitations.some((i) => i.data.subevent_id === s.id),
+  const subs = list(es, 'subevent').filter(
+    (s) =>
+      family.data.self_registration ||
+      invitations.some((i) => i.data.subevent_id === s.id),
   );
   const responses = list(es, 'rsvp').filter((x) =>
     guests.some((g) => g.id === x.data.guest_id),
@@ -1324,8 +1397,15 @@ async function publicRoute(req: Request, raw: string, b: Data) {
       {
         event: {
           name: e!.name,
+          partner1: ed.partner1,
+          partner2: ed.partner2,
+          venue: ed.venue,
+          city: ed.city,
           date: ed.date,
           timezone: ed.timezone,
+          privacy_operator:
+            ed.privacy_operator || `${ed.partner1 || ''} ${ed.partner2 || ''}`.trim(),
+          privacy_contact: ed.privacy_contact || ed.published_invitation.help || '',
           demo: ed.demo,
           version: e!.version,
         },
@@ -1333,11 +1413,17 @@ async function publicRoute(req: Request, raw: string, b: Data) {
         family: {
           name: family.data.name,
           max_companions: family.data.max_companions,
+          self_registration: !!family.data.self_registration,
+          max_members: Number(family.data.max_members) || 4,
+          response_status: list(es, 'family_response').find(
+            (r) => r.data.household_id === family.id,
+          )?.data.status,
         },
         guests: guests.map((g) => ({
           id: g.id,
           data: {
             name: g.data.name,
+            age: g.data.age,
             menu_id: g.data.menu_id,
             allergies: g.data.allergies,
             needs: g.data.needs,
@@ -1367,9 +1453,17 @@ async function publicRoute(req: Request, raw: string, b: Data) {
       403,
       `Termenul RSVP a trecut. Contact: ${ed.published_invitation.help || 'organizatorii evenimentului'}.`,
     );
+  if (family.data.self_registration)
+    return json(await saveFamily(t.event_id, family, guests, subs, es, b));
   if (!Array.isArray(b.responses) || b.responses.length > 100)
     throw new AppError(400, 'Răspuns invalid.');
   const statements: D1PreparedStatement[] = [];
+  const submittedGuests = Array.isArray(b.guests) ? b.guests : [];
+  if (hasSensitiveDetails(submittedGuests) && b.sensitive_consent !== true)
+    throw new AppError(
+      400,
+      'Consimțământul explicit este obligatoriu pentru alergii sau nevoi de accesibilitate.',
+    );
   const seen = new Set();
   for (const r of b.responses) {
     if (
@@ -1419,6 +1513,12 @@ async function publicRoute(req: Request, raw: string, b: Data) {
       transport: !!input.transport,
       accommodation: !!input.accommodation,
     });
+    if (String(data.allergies).trim() || String(data.needs).trim())
+      data.consent = {
+        at: now(),
+        version: PRIVACY_NOTICE_VERSION,
+        source: 'rsvp',
+      };
     enforce('guest', data, es, g.id);
     statements.push(
       stmt(
@@ -1430,12 +1530,16 @@ async function publicRoute(req: Request, raw: string, b: Data) {
       ),
     );
   }
-  const companions = Array.isArray(b.companions)
-    ? b.companions.filter((x: any) => String(x).trim())
-    : [];
-  const existing = guests.filter((g) => g.data.is_companion).length;
-  if (companions.length + existing > family.data.max_companions)
-    throw new AppError(400, 'Numărul maxim de însoțitori a fost depășit.');
+  const companions = Array.isArray(b.companions) ? b.companions : [];
+  if (
+    companions.some((name: unknown) => typeof name !== 'string' || !name.trim())
+  )
+    throw new AppError(
+      400,
+      'Numele fiecărei persoane suplimentare este obligatoriu.',
+    );
+  if (guests.length + companions.length > 100)
+    throw new AppError(400, 'Maximum 100 de persoane pe familie.');
   for (const name of companions) {
     const data = {
       ...validate('guest', { name, household_id: family.id }),

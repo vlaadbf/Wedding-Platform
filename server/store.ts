@@ -8,17 +8,18 @@ import {
   permission,
   list,
 } from '../lib/domain';
-export const bindings = () => env as unknown as Record<string, any>;
+type Bindings = Cloudflare.Env & Partial<Record<'CONFIG_ENCRYPTION_KEY' | 'BOOTSTRAP_SECRET' | 'APP_ORIGIN' | 'RESEND_API_KEY' | 'EMAIL_FROM' | 'RESEND_WEBHOOK_SECRET' | 'TWILIO_ACCOUNT_SID' | 'TWILIO_AUTH_TOKEN' | 'TWILIO_FROM' | 'WHATSAPP_FROM' | 'WHATSAPP_CONTENT_SID' | 'JOB_SECRET' | 'DEMO_LIMIT_PER_HOUR' | 'DEMO_GLOBAL_CAP', string>>;
+export const bindings = () => env as unknown as Bindings;
 export const db = () => bindings().DB as D1Database;
 export const now = () => new Date().toISOString();
-export const stmt = (sql: string, ...args: any[]) =>
+export const stmt = (sql: string, ...args: unknown[]) =>
   db()
     .prepare(sql)
     .bind(...args.map((x) => (x === undefined ? null : x)));
-export async function one<T = Data>(sql: string, ...args: any[]) {
+export async function one<T = Data>(sql: string, ...args: unknown[]) {
   return await stmt(sql, ...args).first<T>();
 }
-export async function all<T = Data>(sql: string, ...args: any[]) {
+export async function all<T = Data>(sql: string, ...args: unknown[]) {
   return (await stmt(sql, ...args).all<T>()).results;
 }
 export async function hash(s: string) {

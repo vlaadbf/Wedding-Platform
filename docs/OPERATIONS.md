@@ -8,6 +8,14 @@ Publicarea inițială este privată. Aceasta este utilă pentru validarea de că
 
 Pentru găzduire proprie Cloudflare: creează D1 și R2, înlocuiește bindingurile în configurația de deployment, aplică migrarea SQL pe baza nouă, configurează secretele serverului, publică artefactul Worker generat și setează schedulerul. Vinext din scaffold este beta; testează compatibilitatea runtime-ului înainte de promovarea unei versiuni.
 
+## Primul super admin în producție
+
+După aplicarea migrațiilor, setează temporar un secret lung și aleator în `BOOTSTRAP_SECRET`, apoi apelează o singură dată `POST /api/admin/bootstrap` cu `Authorization: Bearer <secret>` și JSON-ul `{"email":"admin@example.com","name":"Administrator"}`. Endpointul acceptă maximum trei încercări pe oră și refuză operațiunea dacă există deja un super admin sau dacă revendicarea persistentă `admin-bootstrap` a fost folosită. Răspunsul conține o singură dată linkul de setare a parolei, valabil o oră; nu îl loga și transmite-l administratorului printr-un canal privat. După activare, elimină `BOOTSTRAP_SECRET` din mediu. Operațiunea este înregistrată în `platform_audit`. Pentru dezvoltare locală rămâne disponibil `scripts/provision-admin.mjs`.
+
+## Antete de securitate
+
+Răspunsurile aplicației trec prin `proxy.ts`, care aplică CSP cu nonce unic, interdicție de încadrare, HSTS, `nosniff`, politică de referrer și restricții pentru cameră/microfon/geolocație. Vinext generează scripturi inline pentru hidratare, iar nonce-ul permite aceste scripturi fără `unsafe-inline` în `script-src`. Stilurile inline rămân permise pentru proprietățile vizuale configurabile ale invitațiilor.
+
 ## Backup local
 
 Fișierul SQLite local se află sub `.wrangler/state/v3/d1`. Folosește o copie consistentă, nu copia arbitrar fișierul când baza WAL este deschisă:
@@ -35,4 +43,10 @@ Alertele către un operator, reconcilierea automată la furnizor și monitorizar
 
 ## Date și retenție
 
-Ștergerea operațională este logică și recuperabilă. Aceasta **nu este** ștergere definitivă a datelor personale. Exporturile autorizate sunt disponibile pe module. O procedură completă de export/ștergere de cont și retenție automată după eveniment rămâne de implementat. Până atunci, administratorul bazei trebuie să gestioneze cererile într-o procedură documentată și verificată, inclusiv backupurile și fișierele R2.
+Procesul programat execută cel mult o dată pe oră curățarea ratelor expirate, sesiunilor și tokenurilor de cont expirate, evenimentelor webhook mai vechi de 30 de zile și încercărilor de mesaj mai vechi de 90 de zile. Conturile demo mai vechi de 7 zile fără sesiune activă sunt șterse definitiv împreună cu spațiile, evenimentele, entitățile, joburile, linkurile RSVP și documentele aferente. Crearea demo este limitată implicit la 3 pe oră și IP și la 200 de demo-uri active; super adminul poate modifica valorile în Integrări.
+
+Linkurile RSVP expiră la 30 de zile după eveniment sau după 400 de zile pentru un eveniment fără dată. O campanie nouă revocă linkurile anterioare ale familiei. Linkurile existente la momentul migrației primesc o perioadă de 400 de zile de la creare.
+
+Ștergerea operațională obișnuită a entităților unui eveniment rămâne logică și recuperabilă. Aceasta **nu este** ștergere definitivă a tuturor datelor personale. Exporturile autorizate sunt disponibile pe module. O procedură completă de export/ștergere de cont rămâne de implementat.
+
+Tabelul `audit` nu se curăță automat. Pentru arhivare manuală, oprește mutațiile administrative, exportă rândurile vizate într-un depozit criptat cu acces limitat, verifică numărul de rânduri și integritatea copiei, documentează intervalul și temeiul retenției, apoi șterge din D1 numai intervalul confirmat. Păstrează jurnalul operațiunii separat și testează restaurarea arhivei înainte de reluarea procesării.

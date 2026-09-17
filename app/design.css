@@ -3053,14 +3053,240 @@ button {
 }
 
 /* Operational labels must remain readable on the light palette. */
-.status-confirmed,.status-done,.status-contracted,.status-delivered{color:#486044}
-.status-declined,.status-failed,.status-high{color:#925a48}
-.status-pending,.status-queued,.status-todo,.status-offer{color:#786039}
-.status-progress,.status-accepted{color:#4d686b}
-.status-simulated{color:#6c5d81}
-.status{color:#646c58}
-.metric-caption,.panel-heading p,.task-line small,.event-details,.panel-bottom,.text-link,.person-button small,.table-panel th,.pagination-row,.legend>button,.people-totals,.budget-preview>button,.budget-preview strong,.budget-caption,.budget-caption strong,.task-card p,.task-card-bottom span:first-child,.settings-list dt,.settings-actions p,.team-row small,.integration-card details,.calendar-weekday,.calendar-day>span,.calendar-day button,.public-footer,.auth-form .auth-note,.auth-story p,.auth-features>span{color:#68765c}
-.task-card h3,.report-card h3,.report-card>strong,.report-menus strong,.export-card,.settings-list dd,.team-row strong,.integration-card h3,.notification-row strong,.table-face strong,.pool-guest span,.public-person h3{color:#536a47}
-.invitation-card p{color:#637254}.invitation-kicker,.invitation-date,.invitation-card small,.invite-rsvp-hint{color:#6c7959}
-.public-language{display:flex;justify-content:flex-end;margin-bottom:18px}
-@media(max-width:767px){.metric-number{font-size:24px}.budget-metrics .metric-number{font-size:21px}}
+.status-confirmed,
+.status-done,
+.status-contracted,
+.status-delivered {
+  color: #486044;
+}
+.status-declined,
+.status-failed,
+.status-high {
+  color: #925a48;
+}
+.status-pending,
+.status-queued,
+.status-todo,
+.status-offer {
+  color: #786039;
+}
+.status-progress,
+.status-accepted {
+  color: #4d686b;
+}
+.status-simulated {
+  color: #6c5d81;
+}
+.status {
+  color: #646c58;
+}
+.metric-caption,
+.panel-heading p,
+.task-line small,
+.event-details,
+.panel-bottom,
+.text-link,
+.person-button small,
+.table-panel th,
+.pagination-row,
+.legend > button,
+.people-totals,
+.budget-preview > button,
+.budget-preview strong,
+.budget-caption,
+.budget-caption strong,
+.task-card p,
+.task-card-bottom span:first-child,
+.settings-list dt,
+.settings-actions p,
+.team-row small,
+.integration-card details,
+.calendar-weekday,
+.calendar-day > span,
+.calendar-day button,
+.public-footer,
+.auth-form .auth-note,
+.auth-story p,
+.auth-features > span {
+  color: #68765c;
+}
+.task-card h3,
+.report-card h3,
+.report-card > strong,
+.report-menus strong,
+.export-card,
+.settings-list dd,
+.team-row strong,
+.integration-card h3,
+.notification-row strong,
+.table-face strong,
+.pool-guest span,
+.public-person h3 {
+  color: #536a47;
+}
+.invitation-card p {
+  color: #637254;
+}
+.invitation-kicker,
+.invitation-date,
+.invitation-card small,
+.invite-rsvp-hint {
+  color: #6c7959;
+}
+.public-language {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 18px;
+}
+@media (max-width: 767px) {
+  .metric-number {
+    font-size: 24px;
+  }
+  .budget-metrics .metric-number {
+    font-size: 21px;
+  }
+}
+/* Platform account approval */
+.account-gate {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.account-card {
+  padding: 28px;
+}
+.account-gate .account-card {
+  max-width: 620px;
+}
+.account-card h1,
+.account-admin h1 {
+  font-family: Georgia, serif;
+  font-size: clamp(26px, 4vw, 38px);
+  margin: 16px 0;
+}
+.account-card p {
+  margin: 12px 0;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.account-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 16px 0;
+}
+.account-admin {
+  max-width: 1140px;
+  padding: 32px 24px;
+  margin: 0 auto;
+}
+.account-admin-header,
+.account-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.account-admin-header .eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.account-row {
+  padding: 20px 0;
+  border-bottom: 1px solid #d9ded7;
+}
+.account-row > div {
+  min-width: 0;
+}
+.account-row p {
+  margin: 4px 0;
+}
+.account-row small {
+  color: #52604f;
+}
+.account-decision {
+  border: 1px solid #809278;
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 20px;
+}
+.account-view-banner {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  flex-wrap: wrap;
+  margin: 0;
+  border-radius: 0;
+}
+.account-view-banner span {
+  flex: 1;
+  min-width: 180px;
+  overflow-wrap: anywhere;
+}
+.new-event:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.floor-decor,
+.table-face {
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
+}
+.floor-decor:active,
+.table-face:active {
+  cursor: grabbing;
+}
+.floor-decor:focus-visible,
+.table-face:focus-visible {
+  outline: 3px solid #526a47;
+  outline-offset: 4px;
+}
+.integration-settings-group {
+  margin: 20px 0;
+}
+.integration-clear {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.privacy-consent-note {
+  margin: 18px 0;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--border) 80%, #8b6a43);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--panel) 92%, #f7ead7);
+}
+.privacy-consent-note p {
+  margin: 7px 0 12px;
+  line-height: 1.55;
+}
+.privacy-consent-note a,
+.public-footer a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.privacy-page {
+  min-height: 100vh;
+  padding: 32px 18px 72px;
+}
+.privacy-document {
+  width: min(760px, 100%);
+  margin: 28px auto 0;
+  padding: clamp(24px, 5vw, 48px);
+}
+.privacy-document h1 {
+  margin: 8px 0 24px;
+}
+.privacy-document h2 {
+  margin: 28px 0 8px;
+  font-size: 1.15rem;
+}
+.privacy-document p {
+  line-height: 1.65;
+}

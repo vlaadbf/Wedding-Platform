@@ -1,6 +1,6 @@
 """Exercise real SQLite constraints and verify a backup restore, without app credentials."""
 import sqlite3,tempfile,pathlib,json
-schema=pathlib.Path('drizzle/0000_initial.sql').read_text(encoding='utf-8')
+schema='\n'.join(path.read_text(encoding='utf-8') for path in sorted(pathlib.Path('drizzle').glob('*.sql')))
 with tempfile.TemporaryDirectory() as directory:
  db=sqlite3.connect(pathlib.Path(directory)/'test.sqlite');db.execute('PRAGMA foreign_keys=ON');db.executescript(schema)
  db.execute("INSERT INTO users(id,email,name,created_at) VALUES('u','qa@example.invalid','QA','2026-09-08')")

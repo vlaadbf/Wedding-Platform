@@ -1,0 +1,13 @@
+# Invitație pe familie, persoane completate de invitat
+
+În **Invitați → Familii**, organizatorul adaugă numele familiei, emailul sau telefonul și numărul de locuri rezervate (1–20, implicit 4, inclusiv copiii). Opțiunea **Invitatul completează membrii familiei** este activă implicit pentru familiile noi. Nu trebuie create persoane în avans. Familia primește un link din acțiunea **Link invitație** sau prin campania programată după publicarea invitației.
+
+Destinatarul deschide invitația și completează numele persoanelor, categoria adult/copil, participarea la fiecare moment, meniul, alergiile și serviciile solicitate. Poate alege că familia nu participă, inclusiv fără să introducă persoane. În acest mod invitația include momentele evenimentului; pentru o selecție individuală de subevenimente se păstrează fluxul cu persoane predefinite.
+
+La salvare se creează persoanele, participările și răspunsurile RSVP în aceeași tranzacție SQL. Persoanele apar în listele de invitați, calcule, meniuri și repartizarea la mese. Salvările ulterioare actualizează aceleași persoane; formularul nu permite ștergerea persoanelor salvate, ci marcarea neparticipării. Concurența este verificată prin versiunea evenimentului, iar retrimiterea unei versiuni vechi nu dublează persoanele.
+
+Invitatul poate adăuga persoane peste numărul de locuri rezervate inițial. Formularul indică persoanele în plus, iar organizatorul primește o notificare internă la salvare. Fiecare persoană adăugată trebuie să aibă un nume nevid; numele duplicate sunt respinse. Rămâne o limită tehnică de 100 persoane pe familie. Serverul validează și apartenența persoanelor la familie, momentele și meniurile. Linkurile revocate, evenimentele anulate și termenul RSVP se aplică și acestui flux. Un răspuns la nivelul familiei este salvat ca `family_response`, inclusiv pentru refuzul unei familii fără persoane. Reminderul urmărește și familiile care nu au completat încă persoane, apoi reevaluează eligibilitatea înainte de expediere.
+
+Familiile existente și cele importate cu nume de persoane păstrează fluxul anterior, care permite acum însoțitori suplimentari cu numele obligatoriu. Opțiunea nouă poate fi activată din editarea familiei. Persoanele existente sunt păstrate. Demo-ul prepopulat păstrează exemplele existente, iar familiile nou adăugate folosesc fluxul nou.
+
+Teste: `node tests/family-rsvp.mjs` verifică invitația fără persoane, numele obligatorii, accesul la propria familie, momentele permise, numele duplicate, salvarea persoanelor și meniurilor, retrimiterea, refuzul, eligibilitatea reminderelor și adăugarea peste locurile rezervate.

@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useRef } from 'react';
-import { Data, parseCSV, csv } from '@/lib/domain';
+import { Data, parseCSV } from '@/lib/domain';
 import { Pick } from './controls';
 import { Button } from '@/components/ui/button';
 export function QRCode({ value }: { value: string }) {
@@ -14,9 +14,11 @@ export function QRCode({ value }: { value: string }) {
           color: { dark: '#42563cff', light: '#ffffffff' },
         }),
       )
-      .then(setSrc);
+      .then(setSrc).catch(() => setSrc(''));
   }, [value]);
   return src ? (
+    // The QR code is already a generated data URL and cannot use an image loader.
+    // oxlint-disable-next-line next/no-img-element
     <img
       src={src}
       width={220}
@@ -33,10 +35,10 @@ export async function readSpreadsheet(file: File) {
   await book.xlsx.load(await file.arrayBuffer());
   const sheet = book.worksheets[0];
   if (!sheet) throw new Error('Fișierul nu conține foi.');
-  if (sheet.rowCount > 501)
-    throw new Error('Maximum 500 de persoane per import.');
+  if (sheet.rowCount > 151)
+    throw new Error('Maximum 150 de persoane per import.');
   const rows: string[][] = [];
-  sheet.eachRow((row: any) => {
+  sheet.eachRow((row: import("exceljs").Row) => {
     const cells: string[] = [];
     for (let i = 1; i <= Math.min(row.cellCount, 30); i++)
       cells.push(row.getCell(i).text);
@@ -106,7 +108,7 @@ export function QRScanner({ onCode }: { onCode: (code: string) => void }) {
   );
   const start = async () => {
     try {
-      const Detector = (window as any).BarcodeDetector;
+      const Detector = (window as Window & { BarcodeDetector?: new (options: { formats: string[] }) => { detect(video: HTMLVideoElement): Promise<{rawValue: string}[]> } }).BarcodeDetector;
       if (!Detector)
         throw new Error(
           'Scanarea QR nu este disponibilă în acest browser. Poți folosi cititorul extern sau căutarea după nume.',

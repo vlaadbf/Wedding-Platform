@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: Wedding-Platform
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: 22.13.0
+      - key: APP_ORIGIN
+        value: https://wedding-platform-w0xy.onrender.com
+      - key: DATA_DIR
+        value: .render-state
+      - key: CONFIG_ENCRYPTION_KEY
+        generateValue: true
+      - key: BOOTSTRAP_SECRET
+        generateValue: true

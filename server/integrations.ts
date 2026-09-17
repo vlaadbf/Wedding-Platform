@@ -1,7 +1,9 @@
-import { Data, AppError, uid, list } from '../lib/domain';
-import { bindings, all, one, stmt, now, rows, hash, token, db } from './store';
-export function integrationStatus(demo = false) {
-  const b = bindings();
+import { Data, AppError, uid } from '../lib/domain';
+import { familyPending } from './family-rsvp';
+import { all, one, stmt, now, rows, db, bindings } from './store';
+import { runtimeSettings } from './integration-settings';
+export async function integrationStatus(demo = false) {
+  const b = await runtimeSettings();
   return [
     {
       id: 'email',
@@ -96,8 +98,8 @@ export async function send(
   id: string,
   origin: string,
 ) {
-  const b = bindings();
-  if (!integrationStatus().find((x) => x.id === channel)?.configured)
+  const b = await runtimeSettings();
+  if (!(await integrationStatus()).find((x) => x.id === channel)?.configured)
     return { status: 'unconfigured', error: 'Integrare neconfigurată' };
   try {
     let response: Response;
@@ -161,11 +163,12 @@ export async function send(
   }
 }
 export async function tick(origin: string, eventId?: string, demoOnly = false) {
+  await cleanupMaintenance();
   const due = await all(
     "SELECT * FROM jobs WHERE status='queued' AND due_at<=?" +
       (eventId ? ' AND event_id=?' : '') +
       ' ORDER BY due_at LIMIT 20',
-    ...[now(), ...(eventId ? [eventId] : [])],
+    now(), ...(eventId ? [eventId] : []),
   );
   let processed = 0;
   for (const job of due) {
@@ -191,23 +194,7 @@ export async function tick(origin: string, eventId?: string, demoOnly = false) {
     ).first();
     if (!claim) continue;
     let result: Data = { status: 'skipped', error: '' };
-    const guests = list(allRows, 'guest').filter(
-      (x) => x.data.household_id === job.household_id,
-    );
-    const responses = list(allRows, 'rsvp');
-    const pending = guests.some((g) =>
-      list(allRows, 'guest_invitation')
-        .filter((i) => i.data.guest_id === g.id)
-        .some(
-          (i) =>
-            !responses.some(
-              (r) =>
-                r.data.guest_id === g.id &&
-                r.data.subevent_id === i.data.subevent_id &&
-                r.data.status !== 'pending',
-            ),
-        ),
-    );
+    const pending = family ? familyPending(allRows, family) : false;
     if (
       e.status === 'cancelled' ||
       !family ||
@@ -263,54 +250,122 @@ export async function tick(origin: string, eventId?: string, demoOnly = false) {
     now(),
     new Date(Date.now() - 300000).toISOString(),
   ).run();
-  // Persistent, deduplicated payment reminders. No outbound communication implied.
-  const events = await all(
-    'SELECT id,data FROM events' + (eventId ? ' WHERE id=?' : ''),
+  // Query only due schedules which do not already have a notification. This
+  // avoids loading every entity from every event on each scheduler tick.
+  const cutoff = new Date(Date.now() + 7 * 86400000)
+    .toISOString()
+    .slice(0, 10);
+  const schedules = await all(
+    `SELECT s.id,s.event_id,json_extract(s.data,'$.name') AS name,json_extract(s.data,'$.due') AS due,json_extract(s.data,'$.expense_id') AS expense_id
+     FROM entities s
+     WHERE s.kind='schedule' AND s.deleted_at IS NULL
+       AND json_extract(s.data,'$.due')<=?
+       ${eventId ? 'AND s.event_id=?' : ''}
+       AND NOT EXISTS(SELECT 1 FROM entities n WHERE n.id='due-'||s.id AND n.event_id=s.event_id)
+     ORDER BY json_extract(s.data,'$.due') LIMIT 500`,
+    cutoff,
     ...(eventId ? [eventId] : []),
   );
-  for (const event of events) {
-    const es = await rows(event.id);
-    for (const schedule of list(es, 'schedule')) {
-      const exp = schedule.data.expense_id;
-      const paid =
-        list(es, 'payment')
-          .filter((p) => p.data.expense_id === exp)
-          .reduce((s, p) => s + p.data.amount, 0) -
-        list(es, 'refund')
-          .filter((r) =>
-            list(es, 'payment').some(
-              (p) => p.id === r.data.payment_id && p.data.expense_id === exp,
-            ),
-          )
-          .reduce((s, r) => s + r.data.amount, 0);
-      const due = list(es, 'schedule')
-        .filter(
-          (s) => s.data.expense_id === exp && s.data.due <= schedule.data.due,
-        )
-        .reduce((s, x) => s + x.data.amount, 0);
-      if (
-        Date.parse(schedule.data.due) <= Date.now() + 7 * 86400000 &&
-        paid < due
-      ) {
-        const id = 'due-' + schedule.id;
-        await stmt(
-          'INSERT OR IGNORE INTO entities(id,event_id,kind,data,author_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?)',
-          id,
-          event.id,
-          'notification',
-          JSON.stringify({
-            name: `Scadență: ${schedule.data.name} · ${schedule.data.due}`,
-            read: false,
-            context_id: schedule.id,
-          }),
-          'system',
-          now(),
-          now(),
-        ).run();
-      }
-    }
+  for (const schedule of schedules) {
+    const totals = await one(
+      `SELECT
+       COALESCE((SELECT SUM(CAST(json_extract(p.data,'$.amount') AS INTEGER)) FROM entities p WHERE p.event_id=? AND p.kind='payment' AND p.deleted_at IS NULL AND json_extract(p.data,'$.expense_id')=?),0)
+       - COALESCE((SELECT SUM(CAST(json_extract(r.data,'$.amount') AS INTEGER)) FROM entities r JOIN entities p ON p.event_id=r.event_id AND p.id=json_extract(r.data,'$.payment_id') AND p.kind='payment' AND p.deleted_at IS NULL WHERE r.event_id=? AND r.kind='refund' AND r.deleted_at IS NULL AND json_extract(p.data,'$.expense_id')=?),0) AS paid,
+       COALESCE((SELECT SUM(CAST(json_extract(d.data,'$.amount') AS INTEGER)) FROM entities d WHERE d.event_id=? AND d.kind='schedule' AND d.deleted_at IS NULL AND json_extract(d.data,'$.expense_id')=? AND json_extract(d.data,'$.due')<=?),0) AS due`,
+      schedule.event_id,
+      schedule.expense_id,
+      schedule.event_id,
+      schedule.expense_id,
+      schedule.event_id,
+      schedule.expense_id,
+      schedule.due,
+    );
+    if (Number(totals?.paid) >= Number(totals?.due)) continue;
+    await stmt(
+      'INSERT OR IGNORE INTO entities(id,event_id,kind,data,author_id,created_at,updated_at) VALUES(?,?,?,?,?,?,?)',
+      'due-' + schedule.id,
+      schedule.event_id,
+      'notification',
+      JSON.stringify({
+        name: `Scadență: ${schedule.name} · ${schedule.due}`,
+        read: false,
+        context_id: schedule.id,
+      }),
+      'system',
+      now(),
+      now(),
+    ).run();
   }
   return { ok: true, processed };
+}
+export async function cleanupMaintenance() {
+  const timestamp = now();
+  const claimed = await stmt(
+    "INSERT INTO maintenance(key,ran_at) VALUES('cleanup',?) ON CONFLICT(key) DO UPDATE SET ran_at=excluded.ran_at WHERE maintenance.ran_at<? RETURNING ran_at",
+    timestamp,
+    new Date(Date.now() - 3600000).toISOString(),
+  ).first();
+  if (!claimed) return { ran: false, demos: 0 };
+  await db().batch([
+    stmt('DELETE FROM rate_limits WHERE expires_at<unixepoch()'),
+    stmt('DELETE FROM sessions WHERE expires_at<?', timestamp),
+    stmt('DELETE FROM account_tokens WHERE used_at IS NOT NULL OR expires_at<?', timestamp),
+    stmt("DELETE FROM webhook_events WHERE created_at<datetime(?,'-30 days')", timestamp),
+    stmt("DELETE FROM message_attempts WHERE created_at<datetime(?,'-90 days')", timestamp),
+  ]);
+  const demos = await all(
+    "SELECT u.id FROM users u WHERE u.demo=1 AND u.created_at<datetime(?,'-7 days') AND NOT EXISTS(SELECT 1 FROM sessions s WHERE s.user_id=u.id AND s.expires_at>?)",
+    timestamp,
+    timestamp,
+  );
+  for (const demo of demos) {
+    const workspaces = await all(
+      "SELECT workspace_id AS id FROM workspace_members WHERE user_id=? AND role='owner'",
+      demo.id,
+    );
+    const workspaceIds = workspaces.map((row) => row.id);
+    const events = workspaceIds.length
+      ? await all(
+          `SELECT id FROM events WHERE workspace_id IN (${workspaceIds.map(() => '?').join(',')})`,
+          ...workspaceIds,
+        )
+      : [];
+    const eventIds = events.map((row) => row.id);
+    if (eventIds.length) {
+      const placeholders = eventIds.map(() => '?').join(',');
+      const documents = await all(
+        `SELECT storage_key FROM documents WHERE event_id IN (${placeholders})`,
+        ...eventIds,
+      );
+      const keys = documents.map((row) => String(row.storage_key));
+      if (keys.length) await bindings().FILES.delete(keys).catch(() => undefined);
+      await db().batch([
+        stmt(`DELETE FROM message_attempts WHERE job_id IN (SELECT id FROM jobs WHERE event_id IN (${placeholders}))`, ...eventIds),
+        stmt(`DELETE FROM access_tokens WHERE event_id IN (${placeholders})`, ...eventIds),
+        stmt(`DELETE FROM team_invites WHERE event_id IN (${placeholders})`, ...eventIds),
+        stmt(`DELETE FROM mutations WHERE event_id IN (${placeholders})`, ...eventIds),
+        stmt(`DELETE FROM documents WHERE event_id IN (${placeholders})`, ...eventIds),
+        stmt(`DELETE FROM events WHERE id IN (${placeholders})`, ...eventIds),
+      ]);
+    }
+    if (workspaceIds.length) {
+      const placeholders = workspaceIds.map(() => '?').join(',');
+      await db().batch([
+        stmt(`DELETE FROM workspace_members WHERE workspace_id IN (${placeholders})`, ...workspaceIds),
+        stmt(`DELETE FROM workspaces WHERE id IN (${placeholders})`, ...workspaceIds),
+      ]);
+    }
+    await db().batch([
+      stmt('DELETE FROM event_members WHERE user_id=?', demo.id),
+      stmt('DELETE FROM account_reviews WHERE user_id=? OR reviewer_id=?', demo.id, demo.id),
+      stmt('DELETE FROM integration_settings_audit WHERE actor_id=?', demo.id),
+      stmt('UPDATE integration_settings SET updated_by=NULL WHERE updated_by=?', demo.id),
+      stmt('DELETE FROM sessions WHERE user_id=?', demo.id),
+      stmt('DELETE FROM account_tokens WHERE user_id=?', demo.id),
+      stmt('DELETE FROM users WHERE id=?', demo.id),
+    ]);
+  }
+  return { ran: true, demos: demos.length };
 }
 async function hmac(secret: string, message: string, algorithm = 'SHA-256') {
   const key = await crypto.subtle.importKey(
@@ -327,7 +382,7 @@ async function hmac(secret: string, message: string, algorithm = 'SHA-256') {
 const b64 = (bytes: Uint8Array) => btoa(String.fromCharCode(...bytes));
 export async function webhook(req: Request, provider: string) {
   const raw = await req.text(),
-    b = bindings();
+    b = await runtimeSettings();
   let id: string, pid: string, status: string;
   if (provider === 'resend') {
     if (!b.RESEND_WEBHOOK_SECRET)

@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useCallback, useRef, ReactNode } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Heart,
   LayoutDashboard,
@@ -15,12 +15,10 @@ import {
   ClipboardCheck,
   ChartNoAxesCombined,
   Settings,
-  Plug,
   UserRoundPlus,
   Bell,
   Search,
   Plus,
-  ArrowUpRight,
   ArrowRight,
   ChevronRight,
   ChevronLeft,
@@ -28,8 +26,6 @@ import {
   Upload,
   MoreHorizontal,
   Check,
-  Clock,
-  MapPin,
   LogOut,
   FileText,
   Send,
@@ -38,27 +34,17 @@ import {
   Trash2,
   RotateCcw,
   Grip,
-  SlidersHorizontal,
   Utensils,
   Flower2,
   ShieldCheck,
   Loader2,
   X,
   Eye,
-  PanelLeft,
-  Calendar,
-  MessageSquare,
-  Archive,
   ExternalLink,
   AlertCircle,
   CheckCircle2,
-  Coins,
-  LayoutGrid,
-  List,
   ZoomIn,
   ZoomOut,
-  Play,
-  Pause,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -102,14 +88,12 @@ import {
   TableHead,
   TableCell,
 } from '@/components/ui/table';
-import { Progress } from '@/components/ui/progress';
 import {
   Data,
   Entity,
   schemas,
   labels,
   list,
-  summary,
   money,
   parseMoney,
   parseCSV,
@@ -123,8 +107,23 @@ import {
   Empty,
   Badge,
   api,
+  setAccountScope,
+  scopedUrl,
 } from './controls';
-import { QRCode, QRScanner, ColumnMapping, readSpreadsheet } from './files';
+import { QRCode, ColumnMapping, readSpreadsheet } from './files';
+import { AccountGate, AdminAccounts } from './accounts';
+import { AdminIntegrations } from './integrations';
+import { floorPosition } from '@/lib/floor-geometry';
+import { ReportsPage } from './pages/reports';
+import { TeamPage } from './pages/team';
+import { DocumentsPage } from './pages/documents';
+import { GenericPage } from './pages/generic';
+import { SettingsPage } from './pages/settings';
+import { BudgetPage } from './pages/budget';
+import { TasksPage } from './pages/tasks';
+import { InvitationsPage } from './pages/invitations';
+import { CheckinPage } from './pages/checkin';
+import { DashboardPage } from './pages/dashboard';
 const navGroups = [
   {
     label: 'PLANIFICARE',
@@ -154,7 +153,6 @@ const navGroups = [
       ['reports', 'Rapoarte', ChartNoAxesCombined],
       ['document', 'Documente', FileText],
       ['team', 'Echipă', UserRoundPlus],
-      ['integrations', 'Integrări', Plug],
       ['settings', 'Setări', Settings],
     ],
   },
@@ -168,6 +166,10 @@ const date = (s: string) =>
       }).format(new Date(s + 'T12:00:00'))
     : 'Data nu este stabilită';
 export default function Planner() {
+  const [today] = useState(() => Date.now());
+  const [adminView, setAdminView] = useState(true);
+  const [adminIntegrations, setAdminIntegrations] = useState(false);
+  const [viewedAccount, setViewedAccount] = useState<Data | null>(null);
   const [me, setMe] = useState<Data | null | undefined>(undefined),
     [events, setEvents] = useState<Data[]>([]),
     [eventId, setEventId] = useState(''),
@@ -194,6 +196,7 @@ export default function Planner() {
     s = state?.summary || {},
     base = 'events/' + eventId;
   const can = (kind: string, action = 'view') =>
+    (!viewedAccount || ['view', 'export'].includes(action)) &&
     permission(state?.role, kind, action, state?.grants || {});
   const refresh = useCallback(async (id: string) => {
     if (!id) return;
@@ -220,16 +223,24 @@ export default function Planner() {
     }
   }, []);
   useEffect(() => {
+    if (new URLSearchParams(location.search).has('account_token')) {
+      queueMicrotask(() => setMe(null));
+      return;
+    }
     api('me')
       .then((d) => {
         setMe(d.user);
-        if (d.user) {
-          loadEvents();
+        if (
+          d.user &&
+          (d.user.demo || d.user.approval_status === 'approved') &&
+          d.user.platform_role !== 'super_admin'
+        ) {
+          void loadEvents();
           const t = new URLSearchParams(location.search).get('team_token');
           if (t)
             api('team-accept', 'POST', { token: t })
               .then((r) => {
-                loadEvents(r.event_id);
+                void loadEvents(r.event_id);
                 history.replaceState(null, '', '/');
               })
               .catch((e) => setError(e.message));
@@ -251,9 +262,7 @@ export default function Planner() {
   useEffect(() => {
     if (eventId) {
       sessionStorage.setItem('nn_event', eventId);
-      refresh(eventId).catch((e) => setError(e.message));
-      setSelection([]);
-      setQ('');
+      void Promise.resolve().then(async () => { await refresh(eventId); setSelection([]); setQ(''); }).catch((e) => setError(e.message));
     }
   }, [eventId, refresh]);
   useEffect(() => {
@@ -265,10 +274,10 @@ export default function Planner() {
   useEffect(() => {
     const hash = window.location.hash.slice(1);
     if (navGroups.some((g) => g.items.some((i) => i[0] === hash)))
-      setPage(hash);
+      queueMicrotask(() => setPage(hash));
   }, []);
-  const run = async (
-    fn: () => Promise<any>,
+  const run = async <T,>(
+    fn: () => Promise<T>,
     message = 'Modificările au fost salvate.',
   ) => {
     if (busy) return;
@@ -291,7 +300,7 @@ export default function Planner() {
   };
   function navigate(p: string, f = 'all') {
     setPage(p);
-    setTab('');
+    setTab(p === 'guest' ? (f === 'all' ? 'household' : 'guest') : '');
     setQ('');
     setFilter(f);
     setSelection([]);
@@ -307,6 +316,12 @@ export default function Planner() {
     const d: Data = {};
     for (const f of schemas[kind].fields)
       d[f.key] = record?.data[f.key] ?? defaults[f.key] ?? f.default ?? '';
+    if (
+      kind === 'household' &&
+      record &&
+      record.data.self_registration === undefined
+    )
+      d.self_registration = false;
     for (const f of schemas[kind].fields)
       if (f.type === 'money') d[f.key] = String((d[f.key] || 0) / 100);
     if (!record) {
@@ -359,6 +374,7 @@ export default function Planner() {
     (
       {
         dashboard: 'guest',
+        guest: tab || 'household',
         floor: 'table',
         checkin: 'guest',
         reports: 'guest',
@@ -392,16 +408,16 @@ export default function Planner() {
     } else edit(primaryKind);
   }
   const exportList = (kind: string, format = 'csv') => {
-    window.location.href =
-      '/api/' +
+    window.location.assign(scopedUrl(
       base +
-      '/export?kind=' +
-      kind +
-      '&format=' +
-      format +
-      '&q=' +
-      encodeURIComponent(q) +
-      (filter !== 'all' ? '&status=' + filter : '');
+        '/export?kind=' +
+        kind +
+        '&format=' +
+        format +
+        '&q=' +
+        encodeURIComponent(q) +
+        (filter !== 'all' ? '&status=' + filter : ''),
+    ));
   };
   const publicLink = async (household_id: string) => {
     const r = await api(base + '/invite-link', 'POST', {
@@ -430,6 +446,23 @@ export default function Planner() {
       }
     />
   );
+  const genericPage = (kind: string) => (
+    <GenericPage
+      kind={kind}
+      entities={es}
+      query={q}
+      currency={ed.currency}
+      setQuery={setQ}
+      can={can}
+      exportList={exportList}
+      edit={edit}
+      remove={remove}
+      nameOf={nameOf}
+      invitationLink={(householdId) =>
+        void run(() => publicLink(householdId), '')
+      }
+    />
+  );
   if (me === undefined)
     return (
       <div className="boot">
@@ -447,6 +480,12 @@ export default function Planner() {
             const r = await api('auth/' + mode, 'POST', d);
             if (r.user) {
               setMe(r.user);
+              setAdminView(true);
+              if (
+                (!r.user.demo && r.user.approval_status !== 'approved') ||
+                r.user.platform_role === 'super_admin'
+              )
+                return r;
               await loadEvents(r.event_id);
               const t = new URLSearchParams(location.search).get('team_token');
               if (t) {
@@ -460,8 +499,76 @@ export default function Planner() {
         }
       />
     );
+  const logoutAccount = async () => {
+    await api('auth/logout', 'POST', {});
+    setMe(null);
+    setState(null);
+    setEventId('');
+    setEvents([]);
+    setModal(null);
+    setAccountScope('');
+    setViewedAccount(null);
+  };
+  if (!me.demo && me.approval_status !== 'approved')
+    return (
+      <AccountGate
+        me={me}
+        onLogout={logoutAccount}
+        onRefresh={async () => {
+          const d = await api('me');
+          setMe(d.user);
+          if (
+            d.user?.approval_status === 'approved' &&
+            d.user.platform_role !== 'super_admin'
+          ) {
+            const t = new URLSearchParams(location.search).get('team_token');
+            if (t) {
+              const accepted = await api('team-accept', 'POST', { token: t });
+              await loadEvents(accepted.event_id);
+              history.replaceState(null, '', '/');
+            } else await loadEvents();
+          }
+        }}
+      />
+    );
+  if (!me.demo && me.platform_role === 'super_admin' && adminView)
+    if (adminIntegrations)
+      return <AdminIntegrations onBack={() => setAdminIntegrations(false)} />;
+  if (!me.demo && me.platform_role === 'super_admin' && adminView)
+    return (
+      <AdminAccounts
+        me={me}
+        onIntegrations={() => setAdminIntegrations(true)}
+        onLogout={logoutAccount}
+        onAccount={async (account) => {
+          setAccountScope(account.id);
+          try {
+            const d = await api('events');
+            setViewedAccount(account);
+            setState(null);
+            setExtras({});
+            setModal(null);
+            setEvents(d.events);
+            setEventId(d.events[0]?.id || '');
+            setPage('dashboard');
+            setTab('');
+            setError('');
+            setAdminView(false);
+          } catch (e) {
+            setAccountScope('');
+            throw e;
+          }
+        }}
+        onEvents={() => {
+          setAccountScope('');
+          setViewedAccount(null);
+          setAdminView(false);
+          loadEvents().catch((e) => setError(e.message));
+        }}
+      />
+    );
   const GuestTable = () => {
-    let guests = list(es, 'guest').filter(
+    const guests = list(es, 'guest').filter(
       (g) =>
         (!q ||
           [g.data.name, g.data.email, nameOf(g.data.household_id), g.data.tags]
@@ -716,1352 +823,14 @@ export default function Planner() {
       </>
     );
   };
-  function Dashboard() {
-    const done = list(es, 'task').filter(
-        (t) => t.data.status === 'done',
-      ).length,
-      total = list(es, 'task').length;
-    const days = ed.date
-      ? Math.ceil((Date.parse(ed.date) - Date.now()) / 86400000)
-      : null;
-    return (
-      <>
-        <div className="dashboard-heading">
-          <div>
-            <div className="eyebrow">FIECARE DETALIU, CU DRAG</div>
-            <h1>
-              Ziua voastră prinde contur<span>.</span>
-            </h1>
-            <p>Toate planurile într-un singur loc. Mai mult timp pentru voi.</p>
-          </div>
-          <Button onClick={() => edit('guest')}>
-            <Plus />
-            Adaugă invitat
-          </Button>
-        </div>
-        <div className="event-banner">
-          <div className="event-monogram">
-            {(ed.partner1 || event.name)[0]}
-            <span>&</span>
-            {(ed.partner2 || 'A')[0]}
-          </div>
-          <div className="event-banner-copy">
-            <div className="eyebrow">NE CĂSĂTORIM</div>
-            <h2>{event.name}</h2>
-            <div className="event-details">
-              <span>
-                <CalendarDays />
-                {date(ed.date)}
-              </span>
-              <span>
-                <MapPin />
-                {ed.venue || ed.city || 'Locație de stabilit'}
-              </span>
-            </div>
-          </div>
-          <div className="countdown">
-            <strong>
-              {days === null ? '∞' : days < 0 ? Math.abs(days) : days}
-            </strong>
-            <span>
-              {days === null
-                ? 'toate la timpul lor'
-                : days < 0
-                  ? 'zile de la nuntă'
-                  : 'zile până la „Da”'}
-            </span>
-          </div>
-          <button
-            className="banner-edit"
-            aria-label="Editează evenimentul"
-            onClick={() => navigate('settings')}
-          >
-            <ArrowUpRight />
-          </button>
-        </div>
-        <div className="metric-grid">
-          <Metric
-            label="Invitați confirmați"
-            value={s.confirmed}
-            caption={`din ${s.total} persoane invitate`}
-            icon={<Users />}
-            accent="sage"
-            onClick={() => navigate('guest', 'confirmed')}
-            progress={s.total ? (s.confirmed / s.total) * 100 : 0}
-          />
-          <Metric
-            label="Buget planificat"
-            value={money(ed.budget, ed.currency)}
-            caption={`${money(s.paid, ed.currency)} plăți nete înregistrate`}
-            icon={<Wallet />}
-            accent="sand"
-            onClick={() => navigate('expense')}
-            progress={ed.budget ? (s.paid / ed.budget) * 100 : 0}
-          />
-          <Metric
-            label="Sarcini finalizate"
-            value={
-              <>
-                {done}
-                <em> / {total}</em>
-              </>
-            }
-            caption={
-              total
-                ? `${Math.round((done / total) * 100)}% din planul vostru`
-                : 'Planul începe cu voi'
-            }
-            icon={<CheckSquare />}
-            accent="rose"
-            onClick={() => navigate('task')}
-            progress={total ? (done / total) * 100 : 0}
-          />
-          <Metric
-            label="Locuri de repartizat"
-            value={s.unseated}
-            caption="invitați confirmați fără masă"
-            icon={<Armchair />}
-            accent="lavender"
-            onClick={() => navigate('guest', 'unseated')}
-            progress={
-              s.confirmed ? ((s.confirmed - s.unseated) / s.confirmed) * 100 : 0
-            }
-          />
-        </div>
-        <div className="dashboard-grid">
-          <section className="panel">
-            <div className="panel-heading">
-              <div>
-                <h3>Invitații voștri</h3>
-                <p>Un „da” mai aproape de ziua cea mare.</p>
-              </div>
-              <button className="text-link" onClick={() => navigate('guest')}>
-                Vezi invitații <ArrowRight size={15} />
-              </button>
-            </div>
-            <div className="rsvp-chart">
-              <div
-                className="donut"
-                style={{
-                  background: `conic-gradient(#66836b 0 ${s.total ? (s.confirmed / s.total) * 100 : 0}%, #d8bea1 0 ${s.total ? ((s.confirmed + s.pending) / s.total) * 100 : 0}%, #e4e7e1 0)`,
-                }}
-              >
-                <div>
-                  <strong>{s.total}</strong>
-                  <span>persoane invitate</span>
-                </div>
-              </div>
-              <div className="legend">
-                {[
-                  ['confirmed', s.confirmed, 'Au confirmat'],
-                  ['pending', s.pending, 'Așteptăm răspuns'],
-                  ['declined', s.declined, 'Nu pot participa'],
-                ].map(([v, n, t]) => (
-                  <button key={v} onClick={() => navigate('guest', String(v))}>
-                    <span className={'dot dot-' + v} />
-                    <span>{t}</span>
-                    <strong>{n}</strong>
-                    <ChevronRight size={14} />
-                  </button>
-                ))}
-                <div className="people-totals">
-                  {s.adults} adulți <span>·</span> {s.children} copii{' '}
-                  <span>·</span> {s.households} familii
-                </div>
-              </div>
-            </div>
-            <div className="panel-bottom">
-              <Mail size={17} />
-              <span>
-                {
-                  (state!.jobs || []).filter((j: Data) => j.status === 'queued')
-                    .length
-                }{' '}
-                mesaje în coadă
-              </span>
-              <button
-                className="text-link"
-                onClick={() => {
-                  navigate('invitation');
-                  setTab('campaigns');
-                }}
-              >
-                Gestionează invitațiile <ArrowRight size={15} />
-              </button>
-            </div>
-          </section>
-          <section className="panel">
-            <div className="panel-heading">
-              <div>
-                <h3>Următorii pași</h3>
-                <p>Lucrurile mici care fac diferența.</p>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Adaugă sarcină"
-                onClick={() => edit('task')}
-              >
-                <Plus />
-              </Button>
-            </div>
-            <div className="task-preview">
-              {list(es, 'task')
-                .filter((t) => t.data.status !== 'done')
-                .sort((a, b) =>
-                  (a.data.due || 'z').localeCompare(b.data.due || 'z'),
-                )
-                .slice(0, 4)
-                .map((t) => (
-                  <div className="task-line" key={t.id}>
-                    <Checkbox
-                      aria-label={'Finalizează ' + t.data.name}
-                      checked={false}
-                      onCheckedChange={() =>
-                        run(() => update(t, { status: 'done' }))
-                      }
-                    />
-                    <button onClick={() => edit('task', t)}>
-                      <strong>{t.data.name}</strong>
-                      <small
-                        className={
-                          t.data.due &&
-                          t.data.due < new Date().toISOString().slice(0, 10)
-                            ? 'overdue'
-                            : ''
-                        }
-                      >
-                        {t.data.due ? date(t.data.due) : 'Fără termen'}
-                        {t.data.assignee ? ' · ' + t.data.assignee : ''}
-                      </small>
-                    </button>
-                  </div>
-                ))}
-            </div>
-            <button
-              className="panel-footer-link"
-              onClick={() => navigate('task')}
-            >
-              Vezi toate sarcinile <ArrowRight size={15} />
-            </button>
-          </section>
-          <section className="panel">
-            <div className="panel-heading">
-              <div>
-                <h3>Bugetul, sub control</h3>
-                <p>Estimări, contracte și plăți — fiecare cu locul său.</p>
-              </div>
-              <button className="text-link" onClick={() => navigate('expense')}>
-                Vezi bugetul <ArrowRight size={15} />
-              </button>
-            </div>
-            <div className="budget-preview">
-              {list(es, 'expense')
-                .sort((a, b) => b.data.contracted - a.data.contracted)
-                .slice(0, 4)
-                .map((x, i) => (
-                  <button
-                    key={x.id}
-                    onClick={() => {
-                      navigate('expense');
-                      edit('expense', x);
-                    }}
-                  >
-                    <span>{x.data.category}</span>
-                    <div className="budget-track">
-                      <i
-                        style={{
-                          width:
-                            Math.max(
-                              3,
-                              Math.min(
-                                100,
-                                (x.data.contracted / (ed.budget || 1)) * 200,
-                              ),
-                            ) + '%',
-                          background: [
-                            '#72866b',
-                            '#b99c78',
-                            '#8f9e9c',
-                            '#c5a29a',
-                          ][i],
-                        }}
-                      />
-                    </div>
-                    <strong>{money(x.data.contracted, x.data.currency)}</strong>
-                  </button>
-                ))}
-            </div>
-            <div className="budget-caption">
-              <span>
-                Contractat <strong>{money(s.contracted, ed.currency)}</strong>
-              </span>
-              <span>
-                Rămas de achitat{' '}
-                <strong>{money(s.remaining, ed.currency)}</strong>
-              </span>
-            </div>
-          </section>
-          <section className="panel next-moment">
-            <div className="eyebrow">URMĂTORUL MOMENT IMPORTANT</div>
-            <CalendarDays className="moment-icon" />
-            <h3>
-              {list(es, 'schedule').sort((a, b) =>
-                a.data.due.localeCompare(b.data.due),
-              )[0]?.data.name || 'Scrieți următorul capitol'}
-            </h3>
-            <p>
-              {list(es, 'schedule')[0]
-                ? date(
-                    list(es, 'schedule').sort((a, b) =>
-                      a.data.due.localeCompare(b.data.due),
-                    )[0].data.due,
-                  )
-                : 'Adăugați un termen în calendar.'}
-            </p>
-            <Button
-              variant="outline"
-              onClick={() => {
-                navigate('expense');
-                setTab('schedule');
-              }}
-            >
-              Vezi scadențele <ArrowUpRight />
-            </Button>
-          </section>
-        </div>
-        <div className="dashboard-note">
-          <Heart size={15} /> Nu trebuie să fie totul perfect astăzi. Un pas mic
-          e suficient.
-        </div>
-      </>
-    );
-  }
-  function Generic({ kind }: { kind: string }) {
-    const data = list(es, kind).filter(
-      (r) =>
-        !q || JSON.stringify(r.data).toLowerCase().includes(q.toLowerCase()),
-    );
-    const fields =
-      schemas[kind]?.fields
-        .filter(
-          (f) =>
-            ![
-              'notes',
-              'description',
-              'message',
-              'message_en',
-              'faq',
-              'logistics',
-              'color',
-              'needs',
-              'allergies',
-              'relative_days',
-              'dependency_id',
-            ].includes(f.key),
-        )
-        .slice(0, 6) || [];
-    return (
-      <>
-        <div className="section-toolbar">
-          <div className="search-control">
-            <Search size={17} />
-            <Input
-              aria-label="Caută în listă"
-              placeholder="Caută în listă…"
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-            />
-          </div>
-          {can(kind, 'export') && (
-            <Button variant="outline" onClick={() => exportList(kind)}>
-              <Download />
-              Export CSV
-            </Button>
-          )}
-          {can(kind, 'create') && (
-            <Button onClick={() => edit(kind)}>
-              <Plus />
-              Adaugă {schemas[kind]?.singular.toLowerCase()}
-            </Button>
-          )}
-        </div>
-        {data.length ? (
-          <div className="panel table-panel">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {fields.map((f) => (
-                    <TableHead key={f.key}>{f.label}</TableHead>
-                  ))}
-                  <TableHead>Acțiuni</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data.map((r) => (
-                  <TableRow key={r.id}>
-                    {fields.map((f, i) => (
-                      <TableCell key={f.key}>
-                        {f.type === 'money' ? (
-                          money(r.data[f.key], r.data.currency || ed.currency)
-                        ) : f.ref ? (
-                          nameOf(r.data[f.key])
-                        ) : f.type === 'boolean' ? (
-                          r.data[f.key] ? (
-                            'Da'
-                          ) : (
-                            'Nu'
-                          )
-                        ) : f.options ? (
-                          <Badge value={r.data[f.key]} />
-                        ) : (
-                          <span className={i === 0 ? 'cell-title' : ''}>
-                            {String(r.data[f.key] || '—')}
-                          </span>
-                        )}
-                      </TableCell>
-                    ))}
-                    <TableCell>
-                      <div className="row-actions">
-                        {can(kind, 'edit') && (
-                          <Button variant="ghost" onClick={() => edit(kind, r)}>
-                            Editează
-                          </Button>
-                        )}
-                        {can(kind, 'delete') && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            aria-label={
-                              'Șterge ' +
-                              (r.data.name || schemas[kind].singular)
-                            }
-                            onClick={() => remove(kind, r.id)}
-                          >
-                            <Trash2 size={15} />
-                          </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        ) : (
-          <Empty
-            title="Lista este încă goală"
-            text="Adaugă prima înregistrare pentru acest eveniment."
-          />
-        )}
-      </>
-    );
-  }
-  function Budget() {
-    const current = tab || 'expense';
-    return (
-      <>
-        <div className="metric-grid budget-metrics">
-          <Metric
-            label="Buget planificat"
-            value={money(ed.budget, ed.currency)}
-            icon={<Wallet />}
-            caption="Limita pe care v-ați propus-o"
-            accent="sage"
-          />
-          <Metric
-            label="Estimat"
-            value={money(s.estimated, ed.currency)}
-            caption="Include costurile per persoană"
-            icon={<ChartNoAxesCombined />}
-            accent="sand"
-          />
-          <Metric
-            label="Contractat"
-            value={money(s.contracted, ed.currency)}
-            caption="Valoarea angajată"
-            icon={<FileText />}
-            accent="rose"
-          />
-          <Metric
-            label="Plătit net"
-            value={money(s.paid, ed.currency)}
-            caption="Plăți minus rambursări"
-            icon={<Coins />}
-            accent="lavender"
-          />
-        </div>
-        {s.estimated > ed.budget && (
-          <div className="warning-banner">
-            <AlertCircle />
-            Estimarea depășește bugetul cu{' '}
-            {money(s.estimated - ed.budget, ed.currency)}.
-          </div>
-        )}
-        <TabBar
-          value={current}
-          onChange={setTab}
-          items={[
-            'expense',
-            'schedule',
-            'payment',
-            'refund',
-            'contribution',
-          ].map((v) => ({ value: v, label: schemas[v].label }))}
-        />
-        {current === 'payment' ||
-        current === 'refund' ||
-        current === 'contribution' ? (
-          <div className="info-banner">
-            <ShieldCheck size={18} />
-            Înregistrări manuale de evidență. Aceste acțiuni nu transferă bani.
-          </div>
-        ) : null}
-        {Generic({ kind: current })}
-      </>
-    );
-  }
-  function Tasks() {
-    const view = tab || 'kanban';
-    return (
-      <>
-        <TabBar
-          value={view}
-          onChange={setTab}
-          items={[
-            { value: 'kanban', label: 'Panou Kanban' },
-            { value: 'list', label: 'Listă' },
-            { value: 'calendar', label: 'Calendar' },
-          ]}
-        />
-        {view === 'list' ? (
-          Generic({ kind: 'task' })
-        ) : view === 'calendar' ? (
-          <CalendarView
-            rows={list(es, 'task')}
-            onEdit={(r) => edit('task', r)}
-          />
-        ) : (
-          <div className="kanban">
-            {['todo', 'progress', 'done'].map((status) => (
-              <section
-                key={status}
-                onDragOver={(e) => e.preventDefault()}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  const r = es.find(
-                    (x) => x.id === e.dataTransfer.getData('text/plain'),
-                  );
-                  if (r?.kind === 'task') run(() => update(r, { status }));
-                }}
-              >
-                <div className="kanban-title">
-                  <Badge value={status} />
-                  <span>
-                    {
-                      list(es, 'task').filter((t) => t.data.status === status)
-                        .length
-                    }
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label={'Adaugă în ' + labels[status]}
-                    onClick={() => edit('task', undefined, { status })}
-                  >
-                    <Plus />
-                  </Button>
-                </div>
-                {list(es, 'task')
-                  .filter((t) => t.data.status === status)
-                  .map((t) => (
-                    <article
-                      className="task-card"
-                      key={t.id}
-                      draggable
-                      onDragStart={(e) =>
-                        e.dataTransfer.setData('text/plain', t.id)
-                      }
-                    >
-                      <div className="task-card-top">
-                        <Badge value={t.data.priority} />
-                        <button
-                          aria-label="Editează sarcina"
-                          onClick={() => edit('task', t)}
-                        >
-                          <MoreHorizontal size={18} />
-                        </button>
-                      </div>
-                      <h3>
-                        <button onClick={() => edit('task', t)}>
-                          {t.data.name}
-                        </button>
-                      </h3>
-                      {t.data.description && <p>{t.data.description}</p>}
-                      <div className="task-card-bottom">
-                        <span>
-                          <Calendar size={14} />
-                          {t.data.due ? date(t.data.due) : 'Fără termen'}
-                        </span>
-                        <span className="avatar">
-                          {(t.data.assignee || 'N')[0]}
-                        </span>
-                      </div>
-                    </article>
-                  ))}
-                <button
-                  className="kanban-add"
-                  onClick={() => edit('task', undefined, { status })}
-                >
-                  <Plus size={16} />
-                  Adaugă o sarcină
-                </button>
-              </section>
-            ))}
-          </div>
-        )}
-      </>
-    );
-  }
-  function Invitations() {
-    const mode = tab || 'design';
-    const design = list(es, 'invitation')[0];
-    return (
-      <>
-        <TabBar
-          value={mode}
-          onChange={setTab}
-          items={[
-            { value: 'design', label: 'Designul invitației' },
-            { value: 'campaigns', label: 'Campanii & livrare' },
-            { value: 'automation', label: 'Automatizări' },
-            { value: 'rsvp', label: 'Răspunsuri RSVP' },
-          ]}
-        />
-        {mode === 'design' ? (
-          design ? (
-            <div className="invitation-workspace">
-              <section className="panel invitation-controls">
-                <div className="panel-heading">
-                  <div>
-                    <h3>O invitație cu povestea voastră</h3>
-                    <p>Personalizează, previzualizează și publică.</p>
-                  </div>
-                </div>
-                <div className="invitation-controls-body">
-                  <Badge
-                    value={
-                      design.data.published_at
-                        ? 'Publicată · draft editabil'
-                        : 'Draft'
-                    }
-                  />
-                  <h4>{design.data.name}</h4>
-                  <p>
-                    Șablon {design.data.style}. O nouă publicare păstrează
-                    linkurile trimise.
-                  </p>
-                  <div className="template-swatches">
-                    {[
-                      'Elegant',
-                      'Minimalist',
-                      'Floral',
-                      'Modern',
-                      'Rustic',
-                      'Clasic',
-                    ].map((style, i) => (
-                      <button
-                        className={
-                          design.data.style === style ? 'selected' : ''
-                        }
-                        key={style}
-                        onClick={() => run(() => update(design, { style }))}
-                      >
-                        <span className={'swatch swatch-' + i}>Aa</span>
-                        {style}
-                      </button>
-                    ))}
-                  </div>
-                  <Button
-                    variant="outline"
-                    onClick={() => edit('invitation', design)}
-                  >
-                    <SlidersHorizontal />
-                    Personalizează invitația
-                  </Button>
-                  <Button
-                    onClick={() =>
-                      run(
-                        () =>
-                          api(base + '/publish', 'POST', {
-                            id: design.id,
-                            version: event.version,
-                          }),
-                        'Invitația a fost publicată.',
-                      )
-                    }
-                  >
-                    <Check />
-                    Publică această versiune
-                  </Button>
-                  <div className="divider" />
-                  <label>Link personal pentru familie</label>
-                  <Pick
-                    label="Alege familia"
-                    value={extras.family || ''}
-                    onChange={(family) => setExtras({ ...extras, family })}
-                    options={list(es, 'household').map((h) => ({
-                      value: h.id,
-                      label: h.data.name,
-                    }))}
-                  />
-                  <Button
-                    variant="outline"
-                    disabled={!extras.family}
-                    onClick={() => run(() => publicLink(extras.family), '')}
-                  >
-                    <LinkIcon />
-                    Creează link RSVP
-                  </Button>
-                </div>
-              </section>
-              <section className="preview-zone">
-                <div className="preview-label">
-                  <span>PREVIZUALIZARE INVITAȚIE</span>
-                  <button
-                    onClick={() =>
-                      setExtras({ ...extras, mobile: !extras.mobile })
-                    }
-                  >
-                    {extras.mobile ? 'Desktop' : 'Telefon'}
-                  </button>
-                </div>
-                <InvitationCard
-                  event={event}
-                  design={design.data}
-                  mobile={extras.mobile}
-                />
-              </section>
-            </div>
-          ) : (
-            blank
-          )
-        ) : mode === 'campaigns' ? (
-          <>
-            <div className="section-toolbar">
-              <p className="muted">
-                Răspunsul RSVP și livrarea mesajului sunt urmărite separat.
-              </p>
-              <Button
-                onClick={() => {
-                  setTab('campaigns');
-                  setForm({
-                    channel: 'email',
-                    type: 'invitation',
-                    name: 'Invitația noastră',
-                    message:
-                      'Dragă {family}, vă invităm la nunta {couple}, pe {date}. Confirmați aici: {link}',
-                    date: '',
-                    time: '10:00',
-                  });
-                  setModal({ type: 'campaign' });
-                  setExtras({});
-                }}
-              >
-                <Send />
-                Campanie nouă
-              </Button>
-            </div>
-            {list(es, 'campaign').map((c) => (
-              <div className="panel campaign-card" key={c.id}>
-                <div>
-                  <span className="eyebrow">
-                    {c.data.channel?.toUpperCase()}
-                  </span>
-                  <h3>{c.data.name}</h3>
-                </div>
-                <Badge value={c.data.status} />
-                <div className="row-actions">
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      run(() =>
-                        api(base + '/job-action', 'POST', {
-                          campaign_id: c.id,
-                          action: 'pause',
-                          version: event.version,
-                        }),
-                      )
-                    }
-                  >
-                    <Pause />
-                    Pauză
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() =>
-                      run(() =>
-                        api(base + '/job-action', 'POST', {
-                          campaign_id: c.id,
-                          action: 'resume',
-                          version: event.version,
-                        }),
-                      )
-                    }
-                  >
-                    <Play />
-                    Reia
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    onClick={() =>
-                      setConfirmation(() => async () => {
-                        await api(base + '/job-action', 'POST', {
-                          campaign_id: c.id,
-                          action: 'cancel',
-                          version: event.version,
-                        });
-                      })
-                    }
-                  >
-                    <X />
-                    Anulează
-                  </Button>
-                </div>
-              </div>
-            ))}
-            {ed.demo && (
-              <Button
-                variant="outline"
-                onClick={() =>
-                  run(
-                    () => api(base + '/process-demo', 'POST', {}),
-                    'Procesarea demo a fost executată; niciun mesaj real nu a plecat.',
-                  )
-                }
-              >
-                <Play />
-                Procesează mesajele scadente în demo
-              </Button>
-            )}
-            <div className="panel table-panel mt-5">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Familie</TableHead>
-                    <TableHead>Canal</TableHead>
-                    <TableHead>Programare</TableHead>
-                    <TableHead>Stare</TableHead>
-                    <TableHead>Detalii</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {state!.jobs.map((j: Data) => (
-                    <TableRow key={j.id}>
-                      <TableCell>{nameOf(j.household_id)}</TableCell>
-                      <TableCell>{j.channel}</TableCell>
-                      <TableCell>
-                        {new Date(j.due_at).toLocaleString('ro-RO', {
-                          timeZone: ed.timezone,
-                        })}
-                      </TableCell>
-                      <TableCell>
-                        <Badge value={j.status} />
-                      </TableCell>
-                      <TableCell>{j.error || '—'}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </>
-        ) : (
-          Generic({ kind: mode === 'rsvp' ? 'rsvp' : 'automation' })
-        )}
-      </>
-    );
-  }
-  function Checkin() {
-    const sub = extras.sub || s.reception;
-    const guests = list(es, 'guest').filter(
-      (g) =>
-        (!q || g.data.name.toLowerCase().includes(q.toLowerCase())) &&
-        list(es, 'guest_invitation').some(
-          (i) => i.data.guest_id === g.id && i.data.subevent_id === sub,
-        ),
-    );
-    return (
-      <>
-        <div className="checkin-stats">
-          <strong>
-            {
-              list(es, 'checkin').filter((c) => c.data.subevent_id === sub)
-                .length
-            }
-            <span> persoane sosite</span>
-          </strong>
-          <Pick
-            label="Subeveniment"
-            value={sub}
-            onChange={(v) => setExtras({ ...extras, sub: v })}
-            options={list(es, 'subevent').map((s) => ({
-              value: s.id,
-              label: s.data.name,
-            }))}
-          />
-        </div>
-        <div className="search-control checkin-search">
-          <Search />
-          <Input
-            autoFocus
-            placeholder="Caută numele invitatului…"
-            aria-label="Caută pentru check-in"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-        </div>
-        <div className="section-toolbar">
-          <QRScanner
-            onCode={(qr) =>
-              run(
-                () =>
-                  api(base + '/checkin', 'POST', {
-                    qr,
-                    subevent_id: sub,
-                    version: event.version,
-                  }),
-                'Familie identificată și înregistrată prin QR.',
-              )
-            }
-          />
-          <Input
-            aria-label="Cod QR de la cititor"
-            placeholder="Scanează cu cititorul extern și apasă Enter"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && e.currentTarget.value) {
-                const qr = e.currentTarget.value;
-                e.currentTarget.value = '';
-                run(() =>
-                  api(base + '/checkin', 'POST', {
-                    qr,
-                    subevent_id: sub,
-                    version: event.version,
-                  }),
-                );
-              }
-            }}
-          />
-        </div>
-        <div className="checkin-grid">
-          {guests.slice(0, q ? 100 : 24).map((g) => {
-            const check = list(es, 'checkin').find(
-              (c) => c.data.guest_id === g.id && c.data.subevent_id === sub,
-            );
-            const a = list(es, 'assignment').find(
-              (a) => a.data.guest_id === g.id && a.data.subevent_id === sub,
-            );
-            const r =
-              list(es, 'rsvp').find(
-                (r) => r.data.guest_id === g.id && r.data.subevent_id === sub,
-              )?.data.status || 'pending';
-            return (
-              <article
-                key={g.id}
-                className={'panel checkin-card ' + (check ? 'arrived' : '')}
-              >
-                <div>
-                  <h3>{g.data.name}</h3>
-                  <p>{nameOf(g.data.household_id)}</p>
-                  <span className="table-chip">
-                    <Armchair size={15} />
-                    {a
-                      ? nameOf(a.data.table_id) + ' · loc ' + a.data.seat
-                      : 'Fără masă'}
-                  </span>
-                  <Badge value={r} />
-                  {check && (
-                    <small>
-                      Sosit la{' '}
-                      {new Date(check.data.arrived_at).toLocaleTimeString(
-                        'ro-RO',
-                        { timeZone: ed.timezone },
-                      )}
-                    </small>
-                  )}
-                </div>
-                <div>
-                  <Button
-                    variant={check ? 'outline' : 'default'}
-                    disabled={!online}
-                    onClick={() =>
-                      run(
-                        () =>
-                          api(base + '/checkin', 'POST', {
-                            guest_id: g.id,
-                            subevent_id: sub,
-                            undo: !!check,
-                            version: event.version,
-                          }),
-                        check ? 'Check-in anulat.' : 'Sosire înregistrată.',
-                      )
-                    }
-                  >
-                    <Check />
-                    {check ? 'Anulează' : 'A sosit'}
-                  </Button>
-                  {!check && (
-                    <Button
-                      variant="ghost"
-                      onClick={() =>
-                        run(
-                          () =>
-                            api(base + '/checkin', 'POST', {
-                              household_id: g.data.household_id,
-                              subevent_id: sub,
-                              version: event.version,
-                            }),
-                          'Familia a fost înregistrată.',
-                        )
-                      }
-                    >
-                      Toată familia
-                    </Button>
-                  )}
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </>
-    );
-  }
-  function Reports() {
-    const menus = list(es, 'menu');
-    return (
-      <>
-        <div className="report-grid">
-          {list(es, 'subevent').map((sub) => {
-            const invited = list(es, 'guest_invitation').filter(
-              (i) => i.data.subevent_id === sub.id,
-            );
-            return (
-              <section className="panel report-card" key={sub.id}>
-                <CalendarDays />
-                <h3>{sub.data.name}</h3>
-                <strong>
-                  {invited.length}
-                  <small> persoane invitate</small>
-                </strong>
-                <div className="report-values">
-                  {['confirmed', 'declined', 'pending'].map((status) => (
-                    <div key={status}>
-                      <Badge value={status} />
-                      <b>
-                        {
-                          invited.filter(
-                            (i) =>
-                              (list(es, 'rsvp').find(
-                                (r) =>
-                                  r.data.subevent_id === sub.id &&
-                                  r.data.guest_id === i.data.guest_id,
-                              )?.data.status || 'pending') === status,
-                          ).length
-                        }
-                      </b>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            );
-          })}
-        </div>
-        <section className="panel">
-          <div className="panel-heading">
-            <h3>Centralizator pentru locație</h3>
-            <Button variant="outline" onClick={() => window.print()}>
-              <Download />
-              Tipărește / PDF
-            </Button>
-          </div>
-          <div className="report-menus">
-            {menus.map((m) => (
-              <div key={m.id}>
-                <Utensils />
-                <span>{m.data.name}</span>
-                <strong>
-                  {
-                    list(es, 'guest').filter(
-                      (g) => g.data.menu_id === m.id && stat(g) === 'confirmed',
-                    ).length
-                  }
-                </strong>
-              </div>
-            ))}
-          </div>
-          <div className="panel-bottom">
-            <span>{s.unseated} invitați confirmați fără loc la masă</span>
-            <Button variant="outline" onClick={() => exportList('guest')}>
-              <Download />
-              Lista invitaților cu mese
-            </Button>
-          </div>
-        </section>
-        <div className="report-grid mt-5">
-          {[
-            'guest',
-            'expense',
-            'payment',
-            'vendor',
-            'task',
-            'transport_assignment',
-            'room_assignment',
-          ]
-            .filter((k) => can(k, 'export'))
-            .map((k) => (
-              <button
-                className="panel export-card"
-                key={k}
-                onClick={() => exportList(k)}
-              >
-                <FileText />
-                <span>
-                  {schemas[k].label}
-                  <small>Export CSV</small>
-                </span>
-                <Download size={18} />
-              </button>
-            ))}
-        </div>
-      </>
-    );
-  }
-  function SettingsPage() {
-    return (
-      <div className="settings-grid">
-        <section className="panel">
-          <div className="panel-heading">
-            <div>
-              <h3>Evenimentul vostru</h3>
-              <p>Datele care țin totul împreună.</p>
-            </div>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setForm({ ...ed, name: event.name, budget: ed.budget / 100 });
-                setModal({ type: 'event', id: eventId });
-              }}
-            >
-              Editează
-            </Button>
-          </div>
-          <dl className="settings-list">
-            <div>
-              <dt>Nume</dt>
-              <dd>{event.name}</dd>
-            </div>
-            <div>
-              <dt>Data</dt>
-              <dd>{date(ed.date)}</dd>
-            </div>
-            <div>
-              <dt>Locație</dt>
-              <dd>{ed.venue || 'De stabilit'}</dd>
-            </div>
-            <div>
-              <dt>Fus orar</dt>
-              <dd>{ed.timezone}</dd>
-            </div>
-            <div>
-              <dt>Moneda</dt>
-              <dd>{ed.currency}</dd>
-            </div>
-            <div>
-              <dt>Numele platformei</dt>
-              <dd>{ed.app_name || 'NuntaNoastră'}</dd>
-            </div>
-          </dl>
-        </section>
-        <section className="panel">
-          <div className="panel-heading">
-            <h3>Cont & siguranță</h3>
-          </div>
-          <div className="settings-actions">
-            <p>{me!.email}</p>
-            <Badge
-              value={
-                me!.demo
-                  ? 'Cont demonstrativ'
-                  : me!.verified
-                    ? 'Email verificat'
-                    : 'Email neverificat'
-              }
-            />
-            {!me!.demo && !me!.verified && (
-              <Button
-                variant="outline"
-                onClick={() =>
-                  run(
-                    () => api('auth/verify', 'POST', {}),
-                    'Cererea de verificare a fost acceptată.',
-                  )
-                }
-              >
-                Verifică emailul
-              </Button>
-            )}
-            <Button
-              variant="outline"
-              onClick={() =>
-                setConfirmation(() => async () => {
-                  await api('sessions', 'DELETE');
-                  setMe(null);
-                  setState(null);
-                })
-              }
-            >
-              Închide toate sesiunile
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() =>
-                run(async () => {
-                  setExtras(await api(base + '/audit'));
-                  setModal({ type: 'audit' });
-                }, '')
-              }
-            >
-              <ShieldCheck />
-              Jurnal de audit
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() =>
-                run(async () => {
-                  setExtras(await api(base + '/trash'));
-                  setModal({ type: 'trash' });
-                }, '')
-              }
-            >
-              <Archive />
-              Elemente șterse
-            </Button>
-          </div>
-        </section>
-        <div className="full">
-          <h3 className="subheading">Momentele evenimentului</h3>
-          {Generic({ kind: 'subevent' })}
-        </div>
-      </div>
-    );
-  }
-  function Team() {
-    return (
-      <>
-        <div className="info-banner">
-          <ShieldCheck />
-          Permisiunile sunt verificate pe server pentru fiecare operațiune.
-        </div>
-        <section className="panel">
-          <div className="panel-heading">
-            <h3>Echipa voastră</h3>
-            <Button onClick={add}>
-              <UserRoundPlus />
-              Invită un membru
-            </Button>
-          </div>
-          <div className="team-row">
-            <span className="avatar">{me!.name[0]}</span>
-            <div>
-              <strong>{me!.name}</strong>
-              <small>{me!.email}</small>
-            </div>
-            <Badge
-              value={state!.role === 'owner' ? 'Proprietar' : state!.role}
-            />
-          </div>
-          {extras.members?.map((m: Data) => (
-            <div className="team-row" key={m.user_id}>
-              <span className="avatar">{m.name[0]}</span>
-              <div>
-                <strong>{m.name}</strong>
-                <small>{m.email}</small>
-              </div>
-              <Badge value={m.role} />
-              <Button
-                variant="ghost"
-                onClick={() =>
-                  setConfirmation(() => async () => {
-                    await api(base + '/team', 'DELETE', {
-                      user_id: m.user_id,
-                      version: event.version,
-                    });
-                    setExtras(await api(base + '/team'));
-                  })
-                }
-              >
-                <Trash2 />
-              </Button>
-            </div>
-          ))}
-          {extras.invites?.map((m: Data, i: number) => (
-            <div className="team-row" key={i}>
-              <Mail />
-              <div>
-                <strong>{m.email}</strong>
-                <small>
-                  {m.used_at ? 'Acceptată' : 'Link creat · în așteptare'}
-                </small>
-              </div>
-              <Badge value={m.role} />
-            </div>
-          ))}
-        </section>
-      </>
-    );
-  }
-  function Documents() {
-    return (
-      <>
-        <div className="info-banner">
-          <ShieldCheck />
-          Fișiere private. O copie de contract încărcată nu reprezintă o
-          semnătură electronică.
-        </div>
-        <div className="section-toolbar">
-          <p>Oferte, contracte și detaliile importante.</p>
-          <Button onClick={add}>
-            <Upload />
-            Încarcă document
-          </Button>
-        </div>
-        <div className="report-grid">
-          {extras.items?.map((d: Data) => (
-            <a
-              className="panel export-card"
-              key={d.id}
-              href={'/api/' + base + '/documents/' + d.id}
-            >
-              <FileText />
-              <span>
-                {d.name}
-                <small>
-                  {Math.ceil(d.size / 1024)} KB · versiunea {d.version}
-                </small>
-              </span>
-              <Download />
-            </a>
-          ))}
-        </div>
-        {!extras.items?.length && (
-          <Empty
-            title="Toate documentele, în siguranță"
-            text="Adaugă primul PDF, JPG, PNG sau TXT (maximum 5 MB)."
-          />
-        )}
-      </>
-    );
-  }
   const renderPage = () => {
+    if (viewedAccount && !eventId)
+      return (
+        <Empty
+          title="Acest cont nu are încă evenimente"
+          text={viewedAccount.email}
+        />
+      );
     if (!state)
       return (
         <div className="boot">
@@ -2069,28 +838,155 @@ export default function Planner() {
           <p>Încărcăm evenimentul…</p>
         </div>
       );
-    if (page === 'dashboard') return Dashboard();
+    if (page === 'dashboard')
+      return (
+        <DashboardPage
+          event={event}
+          entities={es}
+          stats={s}
+          today={today}
+          jobs={state.jobs || []}
+          edit={edit}
+          navigate={navigate}
+          setTab={setTab}
+          completeTask={(task) => void run(() => update(task, { status: 'done' }))}
+        />
+      );
     if (page === 'guest')
       return (
         <>
           <TabBar
-            value={tab || 'guest'}
+            value={tab || 'household'}
             onChange={setTab}
             items={[
-              { value: 'guest', label: `Persoane (${s.total})` },
               { value: 'household', label: `Familii (${s.households})` },
+              { value: 'guest', label: `Persoane (${s.total})` },
               {
                 value: 'guest_invitation',
                 label: 'Invitații pe subevenimente',
               },
             ]}
           />
-          {!tab || tab === 'guest' ? GuestTable() : Generic({ kind: tab })}
+          {(!tab || tab === 'household') && (
+            <p className="info-banner">
+              Adaugă familia, datele de contact și locurile rezervate. Invitatul
+              completează persoanele în invitație; acestea apar apoi în fila
+              Persoane, pentru meniuri și mese.
+            </p>
+          )}
+          {tab === 'guest'
+            ? GuestTable()
+            : genericPage(tab || 'household')}
         </>
       );
-    if (page === 'expense') return Budget();
-    if (page === 'task') return Tasks();
-    if (page === 'invitation') return Invitations();
+    if (page === 'expense') {
+      const current = tab || 'expense';
+      return (
+        <BudgetPage
+          current={current}
+          currency={ed.currency}
+          budget={ed.budget}
+          estimated={s.estimated}
+          contracted={s.contracted}
+          paid={s.paid}
+          content={genericPage(current)}
+          setTab={setTab}
+          formatMoney={money}
+        />
+      );
+    }
+    if (page === 'task')
+      return (
+        <TasksPage
+          view={tab || 'kanban'}
+          tasks={list(es, 'task')}
+          listContent={genericPage('task')}
+          setTab={setTab}
+          edit={(record, initial) => edit('task', record, initial)}
+          move={(record, status) => void run(() => update(record, { status }))}
+          formatDate={date}
+        />
+      );
+    if (page === 'invitation') {
+      const mode = tab || 'design';
+      return (
+        <InvitationsPage
+          mode={mode}
+          event={event}
+          entities={es}
+          jobs={state.jobs || []}
+          blank={blank}
+          alternateContent={genericPage(mode === 'rsvp' ? 'rsvp' : 'automation')}
+          canEdit={can('invitation', 'edit')}
+          setTab={setTab}
+          openCampaign={() => {
+            setTab('campaigns');
+            setForm({
+              channel: 'email',
+              type: 'invitation',
+              name: 'Invitația noastră',
+              message:
+                'Dragă {family}, vă invităm la nunta {couple}, pe {date}. Confirmați aici: {link}',
+              date: '',
+              time: '10:00',
+            });
+            setModal({ type: 'campaign' });
+            setExtras({});
+          }}
+          save={async (design, data) => {
+            const result = await api(
+              base + '/records/invitation/' + design.id,
+              'PATCH',
+              { data, version: event.version },
+            );
+            await refresh(eventId);
+            return result;
+          }}
+          publish={async (design, data) => {
+            const saved = await api(
+              base + '/records/invitation/' + design.id,
+              'PATCH',
+              { data, version: event.version },
+            );
+            const result = await api(base + '/publish', 'POST', {
+              id: design.id,
+              version: saved.version,
+            });
+            await refresh(eventId);
+            return result;
+          }}
+          createLink={async (id) => {
+            await publicLink(id);
+            await refresh(eventId);
+          }}
+          jobAction={(campaignId, action) =>
+            void run(() =>
+              api(base + '/job-action', 'POST', {
+                campaign_id: campaignId,
+                action,
+                version: event.version,
+              }),
+            )
+          }
+          confirmCancel={(campaignId) =>
+            setConfirmation(() => async () => {
+              await api(base + '/job-action', 'POST', {
+                campaign_id: campaignId,
+                action: 'cancel',
+                version: event.version,
+              });
+            })
+          }
+          processDemo={() =>
+            void run(
+              () => api(base + '/process-demo', 'POST', {}),
+              'Procesarea demo a fost executată; niciun mesaj real nu a plecat.',
+            )
+          }
+          nameOf={nameOf}
+        />
+      );
+    }
     if (page === 'floor')
       return (
         <>
@@ -2143,6 +1039,7 @@ export default function Planner() {
             </Button>
           </div>
           <FloorPlan
+            readOnly={!!viewedAccount || !can('table', 'edit')}
             entities={es}
             reception={s.reception}
             busy={busy}
@@ -2153,44 +1050,122 @@ export default function Planner() {
           />
         </>
       );
-    if (page === 'checkin') return Checkin();
-    if (page === 'reports') return Reports();
-    if (page === 'settings') return SettingsPage();
-    if (page === 'team') return Team();
-    if (page === 'document') return Documents();
-    if (page === 'integrations')
+    if (page === 'checkin') {
+      const subeventId = extras.sub || s.reception;
       return (
-        <div className="integration-grid">
-          {state.integrations.map((i: Data) => (
-            <section className="panel integration-card" key={i.id}>
-              <div className="integration-logo">
-                {i.id === 'email' ? (
-                  <Mail />
-                ) : i.id === 'stripe' ? (
-                  <Coins />
-                ) : i.id === 'worker' ? (
-                  <Clock />
-                ) : (
-                  <MessageSquare />
-                )}
-              </div>
-              <h3>{i.name}</h3>
-              <Badge
-                value={i.configured ? 'Configurată' : 'Integrare neconfigurată'}
-              />
-              <p>{i.description}</p>
-              <details>
-                <summary>Cerințe de configurare</summary>
-                <p>{i.required}</p>
-                <p>
-                  Configurarea secretelor se face pe server, de către
-                  administrator.
-                </p>
-              </details>
-            </section>
-          ))}
-        </div>
+        <CheckinPage
+          entities={es}
+          subeventId={subeventId}
+          query={q}
+          timezone={ed.timezone}
+          online={online}
+          setSubevent={(id) => setExtras({ ...extras, sub: id })}
+          setQuery={setQ}
+          nameOf={nameOf}
+          scan={(qr, subevent) =>
+            void run(
+              () =>
+                api(base + '/checkin', 'POST', {
+                  qr,
+                  subevent_id: subevent,
+                  version: event.version,
+                }),
+              'Familie identificată și înregistrată prin QR.',
+            )
+          }
+          toggleGuest={(guest, subevent, undo) =>
+            void run(
+              () =>
+                api(base + '/checkin', 'POST', {
+                  guest_id: guest.id,
+                  subevent_id: subevent,
+                  undo,
+                  version: event.version,
+                }),
+              undo ? 'Check-in anulat.' : 'Sosire înregistrată.',
+            )
+          }
+          checkHousehold={(householdId, subevent) =>
+            void run(
+              () =>
+                api(base + '/checkin', 'POST', {
+                  household_id: householdId,
+                  subevent_id: subevent,
+                  version: event.version,
+                }),
+              'Familia a fost înregistrată.',
+            )
+          }
+        />
       );
+    }
+    if (page === 'reports')
+      return (
+        <ReportsPage
+          entities={es}
+          summary={s}
+          canExport={(kind) => can(kind, 'export')}
+          exportList={exportList}
+          guestStatus={stat}
+        />
+      );
+    if (page === 'settings')
+      return (
+        <SettingsPage
+          event={event}
+          me={me!}
+          subevents={genericPage('subevent')}
+          editEvent={() => {
+            setForm({ ...ed, name: event.name, budget: ed.budget / 100 });
+            setModal({ type: 'event', id: eventId });
+          }}
+          verifyEmail={() =>
+            void run(
+              () => api('auth/verify', 'POST', {}),
+              'Cererea de verificare a fost acceptată.',
+            )
+          }
+          closeSessions={() =>
+            setConfirmation(() => async () => {
+              await api('sessions', 'DELETE');
+              setMe(null);
+              setState(null);
+            })
+          }
+          openAudit={() =>
+            void run(async () => {
+              setExtras(await api(base + '/audit'));
+              setModal({ type: 'audit' });
+            }, '')
+          }
+          openTrash={() =>
+            void run(async () => {
+              setExtras(await api(base + '/trash'));
+              setModal({ type: 'trash' });
+            }, '')
+          }
+        />
+      );
+    if (page === 'team')
+      return (
+        <TeamPage
+          me={me!}
+          role={state!.role}
+          data={extras}
+          add={add}
+          remove={(userId) =>
+            setConfirmation(() => async () => {
+              await api(base + '/team', 'DELETE', {
+                user_id: userId,
+                version: event.version,
+              });
+              setExtras(await api(base + '/team'));
+            })
+          }
+        />
+      );
+    if (page === 'document')
+      return <DocumentsPage data={extras} base={base} add={add} />;
     if (page === 'timeline')
       return (
         <>
@@ -2211,7 +1186,7 @@ export default function Planner() {
           ) : (
             <>
               <TimelineWarnings entities={es} />
-              {Generic({ kind: tab || 'timeline' })}
+              {genericPage(tab || 'timeline')}
               <Button variant="outline" onClick={() => downloadICS(event, es)}>
                 <Download />
                 Adaugă în calendar (.ics)
@@ -2238,7 +1213,7 @@ export default function Planner() {
               },
             ]}
           />
-          {Generic({ kind })}
+          {genericPage(kind)}
         </>
       );
     }
@@ -2262,7 +1237,7 @@ export default function Planner() {
           ))}
         </div>
       );
-    return Generic({ kind: page });
+    return genericPage(page);
   };
   const modalTitle =
     modal?.type === 'entity'
@@ -2357,8 +1332,25 @@ export default function Planner() {
           ))}
         </SidebarContent>
         <SidebarFooter>
+          {!me.demo && me.platform_role === 'super_admin' && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                setModal(null);
+                setAccountScope('');
+                setViewedAccount(null);
+                setEventId('');
+                setState(null);
+                setAdminView(true);
+              }}
+            >
+              <ShieldCheck />
+              Administrare conturi
+            </Button>
+          )}
           <button
             className="new-event"
+            disabled={!!viewedAccount}
             onClick={() => {
               setForm({
                 currency: 'RON',
@@ -2388,6 +1380,8 @@ export default function Planner() {
                 run(async () => {
                   await api('auth/logout', 'POST', {});
                   setMe(null);
+                  setAccountScope('');
+                  setViewedAccount(null);
                   setState(null);
                   setEventId('');
                 }, '')
@@ -2399,6 +1393,28 @@ export default function Planner() {
         </SidebarFooter>
       </Sidebar>
       <main className="main-shell">
+        {viewedAccount && (
+          <div className="info-banner account-view-banner">
+            <ShieldCheck />
+            <span>
+              Consultare cont: <strong>{viewedAccount.name}</strong> ·{' '}
+              {viewedAccount.email}
+            </span>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setAccountScope('');
+                setViewedAccount(null);
+                setEventId('');
+                setState(null);
+                setModal(null);
+                setAdminView(true);
+              }}
+            >
+              Înapoi la conturi
+            </Button>
+          </div>
+        )}
         <header className="topbar">
           <div className="breadcrumb">
             <SidebarTrigger />
@@ -2490,16 +1506,16 @@ export default function Planner() {
         </footer>
       </main>
       {toast && (
-        <div className="toast" role="status">
+        <output className="toast">
           <CheckCircle2 />
           {toast}
-        </div>
+        </output>
       )}
       {busy && (
-        <div className="busy-indicator" role="status">
+        <output className="busy-indicator">
           <Loader2 className="spin" />
           Se salvează…
-        </div>
+        </output>
       )}
       <Dialog
         open={!!modal}
@@ -2536,9 +1552,16 @@ export default function Planner() {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                run(saveEntity);
+                void run(saveEntity);
               }}
             >
+              {modal.kind === 'household' && form.self_registration && (
+                <p className="info-banner">
+                  Invitatul va completa persoanele și răspunsurile pentru
+                  momentele evenimentului. Tu rezervi doar numărul de locuri
+                  pentru familie.
+                </p>
+              )}
               <Fields
                 kind={modal.kind}
                 data={form}
@@ -2564,7 +1587,7 @@ export default function Planner() {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                run(async () => {
+                void run(async () => {
                   const data = {
                     ...form,
                     budget: parseMoney(form.budget || 0),
@@ -2618,6 +1641,14 @@ export default function Planner() {
                     options: ['ro', 'en'],
                   },
                   { key: 'app_name', label: 'Numele platformei' },
+                  {
+                    key: 'privacy_operator',
+                    label: 'Operator date (nume persoană / organizație)',
+                  },
+                  {
+                    key: 'privacy_contact',
+                    label: 'Contact pentru confidențialitate',
+                  },
                 ].map((f) => (
                   <FieldControl
                     key={f.key}
@@ -3008,7 +2039,7 @@ export default function Planner() {
                 e.preventDefault();
                 const data = new FormData(e.currentTarget);
                 data.set('version', event.version);
-                run(async () => {
+                void run(async () => {
                   const r = await fetch('/api/' + base + '/documents', {
                     method: 'POST',
                     body: data,
@@ -3171,7 +2202,7 @@ export default function Planner() {
               onClick={() => {
                 const fn = confirmation!;
                 setConfirmation(null);
-                run(fn);
+                void run(fn);
               }}
             >
               Confirmă
@@ -3182,40 +2213,6 @@ export default function Planner() {
     </SidebarProvider>
   );
 }
-function Metric({
-  label,
-  value,
-  caption,
-  icon,
-  accent,
-  onClick,
-  progress,
-}: {
-  label: string;
-  value: ReactNode;
-  caption?: string;
-  icon: ReactNode;
-  accent: string;
-  onClick?: () => void;
-  progress?: number;
-}) {
-  return (
-    <button className="panel metric" onClick={onClick} disabled={!onClick}>
-      <div className="metric-top">
-        <span>{label}</span>
-        <span className={'metric-icon ' + accent}>{icon}</span>
-      </div>
-      <strong className="metric-number">{value}</strong>
-      {progress !== undefined && (
-        <Progress
-          value={Math.min(100, progress)}
-          className={'metric-progress ' + accent}
-        />
-      )}
-      <span className="metric-caption">{caption}</span>
-    </button>
-  );
-}
 function AuthScreen({
   error,
   busy,
@@ -3223,15 +2220,15 @@ function AuthScreen({
 }: {
   error: string;
   busy: boolean;
-  onAction: (mode: string, d: Data) => Promise<any>;
+  onAction: (mode: string, d: Data) => Promise<Data | null | undefined>;
 }) {
   const [mode, setMode] = useState('login'),
-    [form, setForm] = useState<Data>({});
+    [form, setForm] = useState<Data>({}),
+    [notice, setNotice] = useState('');
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     if (params.has('account_token')) {
-      setMode('consume');
-      setForm({ token: params.get('account_token') });
+      queueMicrotask(() => { setMode('consume'); setForm({ token: params.get('account_token') }); });
     }
   }, []);
   return (
@@ -3287,7 +2284,7 @@ function AuthScreen({
           </h2>
           <p>
             {mode === 'register'
-              ? 'Creează un cont și organizează prima voastră nuntă.'
+              ? 'Creează un cont. Accesul se activează după aprobarea de către super admin.'
               : 'Un loc pentru toate planurile voastre.'}
           </p>
           {error && (
@@ -3296,11 +2293,25 @@ function AuthScreen({
             </div>
           )}
           <form
-            onSubmit={(e) => {
+            onSubmit={async (e) => {
               e.preventDefault();
-              onAction(mode, form);
+              setNotice('');
+              const r = await onAction(mode, form);
+              if (r?.ok) {
+                setNotice(
+                  mode === 'consume'
+                    ? 'Parola a fost setată. Autentifică-te cu adresa ta de email și noua parolă.'
+                    : r.message || 'Cererea a fost salvată.',
+                );
+                if (mode === 'consume') {
+                  setMode('login');
+                  setForm({});
+                  history.replaceState(null, '', '/');
+                }
+              }
             }}
           >
+            {notice && <output>{notice}</output>}
             {mode === 'register' && (
               <FieldControl
                 field={{ key: 'name', label: 'Numele tău', required: true }}
@@ -3384,54 +2395,6 @@ function AuthScreen({
     </div>
   );
 }
-export function InvitationCard({
-  event,
-  design,
-  mobile = false,
-}: {
-  event: Data;
-  design: Data;
-  mobile?: boolean;
-}) {
-  return (
-    <div
-      className={
-        'invitation-card style-' +
-        design.style?.toLowerCase() +
-        (mobile ? ' mobile-preview' : '')
-      }
-      style={
-        { '--invite-color': design.color || '#536b57' } as React.CSSProperties
-      }
-    >
-      <div className="invitation-border">
-        <div className="invitation-kicker">
-          CU DRAG, VĂ INVITĂM LA NUNTA NOASTRĂ
-        </div>
-        <div className="invitation-mark">
-          <Heart size={26} />
-        </div>
-        <h2>
-          {event.data.partner1 || event.name.split('&')[0]}
-          <span>&</span>
-          {event.data.partner2 || event.name.split('&')[1]}
-        </h2>
-        <p>{design.message}</p>
-        <div className="invitation-date">
-          {event.data.date ? date(event.data.date) : 'O dată de neuitat'}
-        </div>
-        <div className="invitation-place">
-          {event.data.venue || event.data.city}
-        </div>
-        <div className="invitation-rule" />
-        <small>{design.dress_code}</small>
-        <div className="invite-rsvp-hint">
-          Răspunsul vostru ne-ar bucura nespus.
-        </div>
-      </div>
-    </div>
-  );
-}
 function GuestDetail({
   guest: g,
   entities: es,
@@ -3505,6 +2468,7 @@ function GuestDetail({
   );
 }
 function FloorPlan({
+  readOnly,
   entities: es,
   reception,
   busy,
@@ -3513,6 +2477,7 @@ function FloorPlan({
   onAssign,
   onExport,
 }: {
+  readOnly: boolean;
   entities: Entity[];
   reception: string;
   busy: boolean;
@@ -3548,6 +2513,79 @@ function FloorPlan({
     cy: number;
   } | null>(null);
   const [moving, setMoving] = useState<Data | null>(null);
+  const size = (r: Entity) =>
+    r.kind === 'decor' ? [r.data.width, r.data.height] : [150, 150];
+  function position(r: Entity, clientX: number, clientY: number) {
+    const d = drag.current!;
+    const [width, height] = size(r);
+    return floorPosition(
+      d.x,
+      d.y,
+      clientX - d.cx,
+      clientY - d.cy,
+      zoom,
+      width,
+      height,
+    );
+  }
+  function startDrag(e: React.PointerEvent<HTMLButtonElement>, r: Entity) {
+    if (busy || readOnly || r.data.locked || e.button !== 0) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    drag.current = {
+      id: r.id,
+      x: r.data.x,
+      y: r.data.y,
+      cx: e.clientX,
+      cy: e.clientY,
+    };
+  }
+  function moveDrag(e: React.PointerEvent<HTMLButtonElement>, r: Entity) {
+    if (drag.current?.id === r.id)
+      setMoving({ id: r.id, ...position(r, e.clientX, e.clientY) });
+  }
+  function finishDrag(e: React.PointerEvent<HTMLButtonElement>, r: Entity) {
+    if (drag.current?.id === r.id) {
+      const point = position(r, e.clientX, e.clientY);
+      if (
+        Math.hypot(e.clientX - drag.current.cx, e.clientY - drag.current.cy) >
+          3 &&
+        (point.x !== r.data.x || point.y !== r.data.y)
+      )
+        onMove(r, point.x, point.y);
+    }
+    drag.current = null;
+    setMoving(null);
+  }
+  function cancelDrag() {
+    drag.current = null;
+    setMoving(null);
+  }
+  function keyboardMove(e: React.KeyboardEvent<HTMLButtonElement>, r: Entity) {
+    if (busy || readOnly) return;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      onEdit(r.kind, r);
+      return;
+    }
+    if (
+      r.data.locked ||
+      !['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)
+    )
+      return;
+    e.preventDefault();
+    const step = e.shiftKey ? 50 : 10;
+    const [width, height] = size(r);
+    const p = floorPosition(
+      r.data.x,
+      r.data.y,
+      e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0,
+      e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0,
+      1,
+      width,
+      height,
+    );
+    if (p.x !== r.data.x || p.y !== r.data.y) onMove(r, p.x, p.y);
+  }
   return (
     <>
       <div className="section-toolbar">
@@ -3568,7 +2606,11 @@ function FloorPlan({
             { value: 'list', label: 'Listă accesibilă' },
           ]}
         />
-        <Button variant="outline" onClick={() => onEdit('decor')}>
+        <Button
+          variant="outline"
+          disabled={readOnly || busy}
+          onClick={() => onEdit('decor')}
+        >
           <Plus />
           Element sală
         </Button>
@@ -3688,50 +2730,14 @@ function FloorPlan({
                       >
                         <button
                           className="table-face"
-                          disabled={busy}
+                          disabled={busy || readOnly}
                           onDoubleClick={() => onEdit('table', t)}
-                          onPointerDown={(e) => {
-                            if (t.data.locked) return;
-                            e.currentTarget.setPointerCapture(e.pointerId);
-                            drag.current = {
-                              id: t.id,
-                              x: t.data.x,
-                              y: t.data.y,
-                              cx: e.clientX,
-                              cy: e.clientY,
-                            };
-                          }}
-                          onPointerMove={(e) => {
-                            const d = drag.current;
-                            if (d?.id === t.id)
-                              setMoving({
-                                id: t.id,
-                                x: Math.max(
-                                  0,
-                                  Math.min(
-                                    850,
-                                    Math.round(
-                                      (d.x + (e.clientX - d.cx) / zoom) / 10,
-                                    ) * 10,
-                                  ),
-                                ),
-                                y: Math.max(
-                                  0,
-                                  Math.min(
-                                    750,
-                                    Math.round(
-                                      (d.y + (e.clientY - d.cy) / zoom) / 10,
-                                    ) * 10,
-                                  ),
-                                ),
-                              });
-                          }}
-                          onPointerUp={() => {
-                            if (moving?.id === t.id)
-                              onMove(t, moving.x, moving.y);
-                            drag.current = null;
-                            setMoving(null);
-                          }}
+                          onPointerDown={(e) => startDrag(e, t)}
+                          onPointerMove={(e) => moveDrag(e, t)}
+                          onPointerUp={(e) => finishDrag(e, t)}
+                          onPointerCancel={cancelDrag}
+                          onLostPointerCapture={cancelDrag}
+                          onKeyDown={(e) => keyboardMove(e, t)}
                           aria-label={`${t.data.name}, ${seated.length} din ${t.data.capacity} locuri. Dublu clic pentru editare.`}
                         >
                           <strong>{t.data.name}</strong>
@@ -3780,13 +2786,21 @@ function FloorPlan({
                     <button
                       key={d.id}
                       className="floor-decor"
+                      disabled={busy || readOnly}
                       style={{
-                        left: d.data.x,
-                        top: d.data.y,
+                        left: moving?.id === d.id ? moving.x : d.data.x,
+                        top: moving?.id === d.id ? moving.y : d.data.y,
                         width: d.data.width,
                         height: d.data.height,
                       }}
-                      onClick={() => onEdit('decor', d)}
+                      onPointerDown={(e) => startDrag(e, d)}
+                      onPointerMove={(e) => moveDrag(e, d)}
+                      onPointerUp={(e) => finishDrag(e, d)}
+                      onPointerCancel={cancelDrag}
+                      onLostPointerCapture={cancelDrag}
+                      onDoubleClick={() => onEdit('decor', d)}
+                      onKeyDown={(e) => keyboardMove(e, d)}
+                      aria-label={`${d.data.name}. Trage pentru mutare, săgeți pentru poziționare, Enter sau dublu clic pentru detalii.`}
                     >
                       {d.data.name}
                     </button>
@@ -3827,7 +2841,10 @@ function FloorPlan({
             </div>
           )}
           <div className="panel-bottom">
-            <span>Trage mesele pe grilă. Dublu clic pentru detalii.</span>
+            <span>
+              Trage mesele și elementele sălii. Săgețile mută elementul
+              selectat. Dublu clic pentru detalii.
+            </span>
             <Button variant="ghost" onClick={() => onEdit('assignment')}>
               Repartizare din listă <ArrowRight size={14} />
             </Button>

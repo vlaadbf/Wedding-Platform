@@ -56,8 +56,8 @@ export function FieldControl({
   entities = [],
 }: {
   field: Field;
-  value: any;
-  onChange: (v: any) => void;
+  value: Data[string];
+  onChange: (v: string | number | boolean) => void;
   entities?: Entity[];
 }) {
   if (f.type === 'boolean')
@@ -125,15 +125,25 @@ export function Fields({
 }) {
   return (
     <div className="form-grid">
-      {schemas[kind].fields.map((f) => (
-        <FieldControl
-          key={f.key}
-          field={f}
-          value={data[f.key]}
-          entities={entities}
-          onChange={(v) => setData({ ...data, [f.key]: v })}
-        />
-      ))}
+      {schemas[kind].fields
+        .filter(
+          (f) =>
+            !(
+              ['decor', 'table'].includes(kind) && ['x', 'y'].includes(f.key)
+            ) &&
+            (kind !== 'household' ||
+              ((f.key !== 'max_companions' || !data.self_registration) &&
+                (f.key !== 'max_members' || data.self_registration))),
+        )
+        .map((f) => (
+          <FieldControl
+            key={f.key}
+            field={f}
+            value={data[f.key]}
+            entities={entities}
+            onChange={(v) => setData({ ...data, [f.key]: v })}
+          />
+        ))}
     </div>
   );
 }
@@ -181,11 +191,35 @@ export function Badge({ value }: { value: string }) {
     <span className={'status status-' + value}>{labels[value] || value}</span>
   );
 }
-export async function api(path: string, method = 'GET', body?: any) {
+let accountScope = '';
+export const setAccountScope = (id: string) => {
+  accountScope = id;
+};
+export const scopedUrl = (path: string) =>
+  '/api/' +
+  path +
+  (accountScope
+    ? (path.includes('?') ? '&' : '?') +
+      'admin_account=' +
+      encodeURIComponent(accountScope)
+    : '');
+export async function api(path: string, method: string = 'GET', body?: unknown) {
+  if (
+    accountScope &&
+    method !== 'GET' &&
+    !path.startsWith('admin/') &&
+    path !== 'auth/logout'
+  )
+    throw new Error('Contul clientului este deschis pentru consultare.');
   const r = await fetch('/api/' + path, {
     method,
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
-    body: body ? JSON.stringify(body) : undefined,
+    headers: {
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+      ...(accountScope && path.startsWith('events')
+        ? { 'X-Admin-Account': accountScope }
+        : {}),
+    },
+    ...(method !== 'GET' && method !== 'HEAD' && body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
   const d = (await r.json()) as Data;
   if (!r.ok) throw new Error(d.error?.message || 'Operațiunea nu a reușit.');

@@ -30,7 +30,7 @@ Erori: `{ "error": { "code": "version_conflict", "message": "…", "correlation"
 
 Mutațiile primesc revizia evenimentului din ultimul GET. Succesul întoarce `{ok,id,version}`. Revizia este verificată de trigger SQL în aceeași tranzacție D1 batch cu scrierile și auditul. La 409 reîncarcă și cere reaplicarea intenției. Nu reîncerca orbește.
 
-`POST events/:event/import`: rows, preview, duplicate_policy (`skip`, `create`, `update`), matches (identificator ales explicit pentru fiecare rând de actualizat), key și version. Preview întoarce erori și posibile duplicate pe rând. Maximum 500 persoane; întregul import valid se aplică atomic. Cheia trebuie refolosită pentru aceeași încercare; repetarea unei mutații deja înregistrate produce 409 fără duplicate.
+`POST events/:event/import`: rows, preview, duplicate_policy (`skip`, `create`, `update`), matches (identificator ales explicit pentru fiecare rând de actualizat), key și version. Preview întoarce erori și posibile duplicate pe rând. Maximum 150 persoane; întregul import valid se aplică atomic. Cheia trebuie refolosită pentru aceeași încercare; repetarea unei mutații deja înregistrate produce 409 fără duplicate.
 
 `GET events/:event/export?kind=guest&q=&status=&format=csv|xlsx`: filtre și permisiuni de export. CSV neutralizează formulele. XLSX stochează valori ca text, nu formule. Fișierul invitaților include numele mesei, locul și RSVP pentru recepție.
 

@@ -203,6 +203,7 @@ export async function createEvent(
     for (let family = 0; n < 120; family++) {
       const size = Math.min([2, 3, 1, 4, 2, 2, 3][family % 7], 120 - n);
       const household = add('household', {
+        self_registration: false,
         name: `Familia ${last[family % last.length]} ${family + 1}`,
         email: `familia${family + 1}@example.invalid`,
         language: 'ro',
