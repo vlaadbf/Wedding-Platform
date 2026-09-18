@@ -220,6 +220,8 @@ async function route(req: Request): Promise<Response> {
     method === 'POST'
   )
     return json(await bootstrapAdmin(req, body, publicOrigin), 201);
+  if (parts[0] === 'public-event')
+    return publicEventRoute(req, parts[1], method);
   if (parts[0] === 'public') return publicRoute(req, parts[1], body);
   if (parts[0] === 'me') {
     const u = await user(req);
@@ -1362,6 +1364,56 @@ async function importGuests(
   );
   return json({ ...result, created, updated, skipped, report });
 }
+async function publicEventRoute(req: Request, eventId: string, method: string) {
+  await rate(req, 'public-event', 120);
+  if (method !== 'GET') throw new AppError(405, 'Metodă indisponibilă.');
+  if (!/^[a-f0-9-]{36}$/i.test(eventId || ''))
+    throw new AppError(404, 'Eveniment indisponibil.');
+  const event = await one('SELECT * FROM events WHERE id=?', eventId);
+  if (!event) throw new AppError(404, 'Eveniment indisponibil.');
+  const data = JSON.parse(event.data);
+  if (data.status === 'cancelled')
+    throw new AppError(410, 'Evenimentul a fost anulat.');
+  if (!data.published_invitation)
+    return json(
+      { published: false },
+      200,
+      { 'X-Robots-Tag': 'noindex, nofollow' },
+    );
+  const entities = await rows(eventId);
+  return json(
+    {
+      published: true,
+      event: {
+        id: event.id,
+        name: event.name,
+        data: {
+          date: data.date,
+          city: data.city,
+          venue: data.venue,
+          partner1: data.partner1,
+          partner2: data.partner2,
+        },
+      },
+      invitation: data.published_invitation,
+      subevents: list(entities, 'subevent').map((subevent) => ({
+        id: subevent.id,
+        data: {
+          name: subevent.data.name,
+          date: subevent.data.date,
+          start: subevent.data.start,
+          end: subevent.data.end,
+          venue: subevent.data.venue,
+          address: subevent.data.address,
+          instructions: subevent.data.instructions,
+        },
+      })),
+    },
+    200,
+    { 'X-Robots-Tag': 'noindex, nofollow' },
+  );
+}
+
 async function publicRoute(req: Request, raw: string, b: Data) {
   await rate(req, 'rsvp', 60);
   if (!/^[a-f0-9]{64}$/.test(raw || ''))

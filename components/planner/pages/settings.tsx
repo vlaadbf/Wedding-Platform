@@ -1,10 +1,11 @@
 'use client';
-import { memo, ReactNode } from 'react';
-import { Archive, Check, Palette, ShieldCheck } from 'lucide-react';
+import { memo, ReactNode, useSyncExternalStore } from 'react';
+import { Archive, Check, ExternalLink, Palette, QrCode, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Data } from '@/lib/domain';
 import { userThemes } from '@/lib/themes';
 import { Badge } from '../controls';
+import { DownloadableQRCode } from '../files';
 
 const formatDate = (value: string) =>
   value
@@ -37,6 +38,18 @@ export const SettingsPage = memo(function SettingsPage({
   changeTheme: (theme: string) => void;
 }) {
   const data = event.data || {};
+  const origin = useSyncExternalStore(
+    () => () => undefined,
+    () => window.location.origin,
+    () => '',
+  );
+  const publicUrl = origin ? `${origin}/eveniment/${event.id}` : '';
+  const qrFilename = `${String(event.name || 'eveniment')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase()}-qr.png`;
   return (
     <div className="settings-grid">
       <section className="panel theme-panel full">
@@ -74,6 +87,41 @@ export const SettingsPage = memo(function SettingsPage({
               </label>
             );
           })}
+        </div>
+      </section>
+      <section className="panel event-qr-panel full">
+        <div className="panel-heading">
+          <div>
+            <h3><QrCode /> Cod QR pentru eveniment</h3>
+            <p>Descarcă-l, tipărește-l și așază-l unde invitații îl pot scana.</p>
+          </div>
+          <Badge value={data.published_invitation ? 'Invitație publicată' : 'Nepublicată'} />
+        </div>
+        <div className="event-qr-layout">
+          {publicUrl && <DownloadableQRCode value={publicUrl} filename={qrFilename} />}
+          <div className="event-qr-copy">
+            <strong>Pagina publică a evenimentului</strong>
+            <p>
+              Codul deschide invitația publicată și programul evenimentului. Nu afișează
+              lista sau datele personale ale invitaților.
+            </p>
+            {!data.published_invitation && (
+              <p className="qr-publish-note">
+                Publică mai întâi invitația din „Invitații digitale”. QR-ul rămâne același
+                și va deveni activ imediat după publicare.
+              </p>
+            )}
+            {publicUrl && (
+              <a className="event-public-link" href={publicUrl} target="_blank" rel="noreferrer">
+                <ExternalLink aria-hidden="true" />
+                Deschide pagina publică
+              </a>
+            )}
+            <small>
+              Pentru confirmarea RSVP, trimite fiecărei familii linkul personal din pagina
+              Invitații digitale.
+            </small>
+          </div>
         </div>
       </section>
       <section className="panel">

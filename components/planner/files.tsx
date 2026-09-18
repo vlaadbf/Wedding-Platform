@@ -1,21 +1,28 @@
 'use client';
 import { useEffect, useState, useRef } from 'react';
+import { Download } from 'lucide-react';
 import { Data, parseCSV } from '@/lib/domain';
 import { Pick } from './controls';
 import { Button } from '@/components/ui/button';
-export function QRCode({ value }: { value: string }) {
+function useQRCode(value: string, width: number) {
   const [src, setSrc] = useState('');
   useEffect(() => {
+    if (!value) return;
     import('qrcode')
       .then((q) =>
         q.toDataURL(value, {
-          width: 220,
-          margin: 2,
-          color: { dark: '#42563cff', light: '#ffffffff' },
+          width,
+          margin: 3,
+          color: { dark: '#4e342cff', light: '#fffaf4ff' },
         }),
       )
-      .then(setSrc).catch(() => setSrc(''));
-  }, [value]);
+      .then(setSrc)
+      .catch(() => setSrc(''));
+  }, [value, width]);
+  return src;
+}
+export function QRCode({ value }: { value: string }) {
+  const src = useQRCode(value, 220);
   return src ? (
     // The QR code is already a generated data URL and cannot use an image loader.
     // oxlint-disable-next-line next/no-img-element
@@ -26,6 +33,27 @@ export function QRCode({ value }: { value: string }) {
       alt="Cod QR cu identificator opac pentru invitație"
     />
   ) : null;
+}
+export function DownloadableQRCode({
+  value,
+  filename,
+}: {
+  value: string;
+  filename: string;
+}) {
+  const src = useQRCode(value, 1024);
+  if (!src) return <p className="muted">Pregătim codul QR…</p>;
+  return (
+    <div className="event-qr-code">
+      {/* The QR code is generated locally as a PNG data URL. */}
+      {/* oxlint-disable-next-line next/no-img-element */}
+      <img src={src} width={220} height={220} alt="Cod QR pentru pagina publică a evenimentului" />
+      <a className="qr-download" href={src} download={filename}>
+        <Download aria-hidden="true" />
+        Descarcă QR pentru tipar
+      </a>
+    </div>
+  );
 }
 export async function readSpreadsheet(file: File) {
   if (file.size > 5 * 1024 * 1024) throw new Error('Fișierul depășește 5 MB.');

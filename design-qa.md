@@ -27,3 +27,35 @@ Date: 2026-09-17
 - Browser console showed no application errors; unrelated browser-extension messages were excluded.
 
 final result: passed
+
+---
+
+# Design QA — Setări responsive și cod QR public
+
+Date: 2026-09-18
+
+## Target
+
+- Settings route: `http://localhost:3000/#settings`
+- Public event route: `http://localhost:3000/eveniment/:eventId`
+- Mobile viewport: 390 × 844 px
+
+## Visual and responsive checks
+
+- Theme cards remain readable in a compact 2 × 2 mobile grid.
+- Settings rows, buttons, long values, and tables stay inside the viewport.
+- Settings page has no horizontal overflow (`clientWidth: 375`, `scrollWidth: 375`).
+- The printable QR panel stacks cleanly on mobile and keeps the download action easy to reach.
+- The public invitation and event schedule render correctly on mobile with no horizontal overflow (`clientWidth: 375`, `scrollWidth: 375`).
+
+## Functional and privacy checks
+
+- The QR download is a 1024 px PNG data URL with an event-specific filename.
+- The public URL remains stable for the event and shows a waiting state until the invitation is published.
+- Once published, the public page shows the invitation and event schedule.
+- The public API returns only event, invitation, and schedule fields; it does not return guests, families, RSVP answers, or authentication data.
+- Personalized RSVP links remain separate for each family.
+- TypeScript, lint, and the production build passed.
+- Browser console showed no application warnings or errors on Settings and the public event page.
+
+final result: passed

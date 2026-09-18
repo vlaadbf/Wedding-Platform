@@ -73,7 +73,7 @@ export function InvitationStudio({
       <section className="template-library">
         <header className="template-library-header">
           <div>
-            <p className="eyebrow">COLECȚIA NUNTANOASTRĂ</p>
+            <p className="eyebrow">COLECȚIA PLANORA</p>
             <h2>O invitație la fel de unică precum voi.</h2>
             <p>10 modele · 5 categorii · personalizare în timp real</p>
           </div>
