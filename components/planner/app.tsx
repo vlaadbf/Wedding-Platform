@@ -2294,6 +2294,13 @@ function AuthScreen({
           : 'Continuăm de unde ai rămas.';
   return (
     <div className="auth-shell">
+      <aside className="auth-visual" aria-hidden="true">
+        <div className="auth-visual-copy">
+          <span>PLANURI FRUMOASE, ÎMPREUNĂ</span>
+          <h2>Fiecare detaliu își găsește locul.</h2>
+          <p>De la prima idee până la ultimul dans.</p>
+        </div>
+      </aside>
       <main className="auth-panel">
         <header className="auth-brand">
           <span className="brand-icon">

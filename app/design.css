@@ -3518,6 +3518,7 @@ button {
 
 /* Planora authentication */
 .auth-shell {
+  position: relative;
   min-height: 100svh;
   display: block;
   overflow-x: hidden;
@@ -3527,6 +3528,9 @@ button {
   background-repeat: no-repeat;
   background-size: cover;
   color: #5a3428;
+}
+.auth-visual {
+  display: none;
 }
 .auth-panel {
   width: min(100%, 610px);
@@ -3746,9 +3750,88 @@ button {
   color: #755247;
 }
 
-@media (min-width: 900px) {
+@media (min-width: 960px) {
+  .auth-shell {
+    display: grid;
+    grid-template-columns: minmax(420px, 1fr) minmax(560px, 720px);
+    background: #f3e8dc;
+  }
+  .auth-visual {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    min-height: 100svh;
+    overflow: hidden;
+    align-items: flex-end;
+    padding: clamp(52px, 6vw, 96px);
+    background:
+      radial-gradient(circle at 83% 12%, rgba(255, 250, 244, 0.62) 0 10%, transparent 10.2%),
+      radial-gradient(circle at 83% 12%, transparent 0 20%, rgba(126, 84, 67, 0.12) 20.2% 30%, transparent 30.2%),
+      linear-gradient(138deg, #f0e3d4 0%, #dfc8b6 50%, #c99278 100%);
+    color: #4f2d24;
+  }
+  .auth-visual::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    width: clamp(440px, 46vw, 820px);
+    aspect-ratio: 1;
+    top: clamp(-330px, -17vw, -150px);
+    right: clamp(-300px, -13vw, -110px);
+    border: clamp(54px, 5.2vw, 96px) solid rgba(255, 249, 241, 0.38);
+    border-radius: 50%;
+    box-shadow:
+      0 0 0 clamp(42px, 4vw, 76px) rgba(150, 91, 68, 0.23),
+      0 0 0 clamp(95px, 9vw, 170px) rgba(248, 237, 224, 0.34);
+  }
+  .auth-visual::after {
+    content: '♡';
+    position: absolute;
+    z-index: -1;
+    top: 33%;
+    right: 10%;
+    color: rgba(110, 61, 47, 0.34);
+    font: clamp(120px, 13vw, 230px)/1 Georgia, serif;
+    transform: rotate(-8deg);
+  }
+  .auth-visual-copy {
+    max-width: 650px;
+    text-wrap: balance;
+  }
+  .auth-visual-copy span {
+    display: block;
+    margin-bottom: 20px;
+    color: rgba(79, 45, 36, 0.74);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+  }
+  .auth-visual-copy h2 {
+    max-width: 620px;
+    font: clamp(54px, 5vw, 88px)/0.96 Georgia, 'Times New Roman', serif;
+    letter-spacing: -0.045em;
+  }
+  .auth-visual-copy p {
+    margin-top: 25px;
+    color: rgba(79, 45, 36, 0.78);
+    font-size: clamp(17px, 1.4vw, 22px);
+  }
   .auth-panel {
-    margin-left: max(4vw, calc((100vw - 1180px) / 2));
+    width: 100%;
+    min-height: 100svh;
+    margin: 0;
+    padding: clamp(40px, 5vh, 66px) clamp(48px, 5vw, 76px);
+    justify-content: center;
+    border-left: 1px solid rgba(118, 77, 61, 0.14);
+    background: rgba(252, 248, 242, 0.94);
+    box-shadow: -24px 0 70px rgba(79, 45, 36, 0.08);
+    backdrop-filter: blur(12px);
+  }
+  .auth-intro {
+    margin: clamp(34px, 5vh, 58px) 0 28px;
+  }
+  .auth-intro h1 {
+    font-size: clamp(50px, 4.2vw, 66px);
   }
 }
 

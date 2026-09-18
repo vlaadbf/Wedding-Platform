@@ -30,6 +30,30 @@ final result: passed
 
 ---
 
+# Design QA — Fundal autentificare responsive
+
+Date: 2026-09-18
+
+## Target
+
+- Route: `http://localhost:3000/`
+- States: login and registration
+- Viewports: 390 × 844, 768 × 1024, 1440 × 1000, 1920 × 1080
+
+## Visual and responsive checks
+
+- Mobile and tablet retain the sand artwork at proportions suited to portrait screens.
+- Desktop uses a dedicated two-column composition with CSS-generated sand shapes instead of enlarging the portrait artwork.
+- The form stays in a stable, readable panel while the decorative area expands on wide monitors.
+- Login and registration have no horizontal overflow at the tested sizes.
+- The 390 × 844 registration screen fits without vertical scrolling.
+- Browser console showed no warnings or errors.
+- TypeScript, lint, and the production build passed.
+
+final result: passed
+
+---
+
 # Design QA — Setări responsive și cod QR public
 
 Date: 2026-09-18
